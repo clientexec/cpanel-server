@@ -13,9 +13,13 @@ require_once dirname(__FILE__).'/CpanelApi.php';
  */
 class PluginCpanel extends ServerPlugin
 {
-    public $usesPackageName = true;
-    public $canTestConnect = true;
-    var $api;
+    public $features = array(
+        'packageName' => true,
+        'testConnection' => true,
+        'showNameservers' => true
+    );
+
+    public $api;
 
 	function getVariables()
 	{
