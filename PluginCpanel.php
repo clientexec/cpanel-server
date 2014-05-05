@@ -162,7 +162,9 @@ class PluginCpanel extends ServerPlugin
     function email_error ( $name, $message, $args )
     {
         $error = "cPanel Account ".$name." Failed. ";
-        $error .= "A email with the Details was sent to ". $args['server']['variables']['plugin_cpanel_Failure_E-mail'].'<br /><br />';
+        if (trim($args['server']['variables']['plugin_cpanel_Failure_E-mail'])) {
+          $error .= "An email with the Details was sent to ". $args['server']['variables']['plugin_cpanel_Failure_E-mail'].".\n";
+        }
 
         if ( is_array($message) ) {
             $message = implode ( "\n", trim($message) );
