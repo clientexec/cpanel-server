@@ -31,110 +31,110 @@ class PluginCpanel extends ServerPlugin
 	   */
 
         $variables = array (
-                   /*T*/"Name"/*/T*/ => array (
+                   lang("Name") => array (
                                         "type"=>"hidden",
                                         "description"=>"Used By CE to show plugin - must match how you call the action function names",
                                         "value"=>"CPanel"
                                        ),
-                   /*T*/"Description"/*/T*/ => array (
+                   lang("Description") => array (
                                         "type"=>"hidden",
-                                        "description"=>/*T*/"Description viewable by admin in server settings"/*/T*/,
-                                        "value"=>/*T*/"CPanel control panel integration"/*/T*/
+                                        "description"=>lang("Description viewable by admin in server settings"),
+                                        "value"=>lang("CPanel control panel integration")
                                        ),
-                   /*T*/"Username"/*/T*/ => array (
+                   lang("Username") => array (
                                         "type"=>"text",
-                                        "description"=>/*T*/"Username used to connect to server"/*/T*/,
+                                        "description"=>lang("Username used to connect to server"),
                                         "value"=>""
                                        ),
-                   /*T*/"Access Hash"/*/T*/ => array (
+                   lang("Access Hash") => array (
                                         "type"=>"textarea",
-                                        "description"=>/*T*/"Password used to connect to server"/*/T*/,
+                                        "description"=>lang("Password used to connect to server"),
                                         "value"=>"",
                                         "encryptable"=>true
                                        ),
-                   /*T*/"Use SSL"/*/T*/ => array (
+                   lang("Use SSL") => array (
                                         "type"=>"yesno",
-                                        "description"=>/*T*/"Set NO if you do not have PHP compiled with cURL.  YES if your PHP is compiled with cURL<br><b>NOTE:</b>It is suggested that you keep this as YES"/*/T*/,
+                                        "description"=>lang("Set NO if you do not have PHP compiled with cURL.  YES if your PHP is compiled with cURL<br><b>NOTE:</b>It is suggested that you keep this as YES"),
                                         "value"=>"1"
                                        ),
-                   /*T*/"Failure E-mail"/*/T*/ => array (
+                   lang("Failure E-mail") => array (
                                         "type"=>"text",
-                                        "description"=>/*T*/"E-mail address Cpanel error messages will be sent to"/*/T*/,
+                                        "description"=>lang("E-mail address Cpanel error messages will be sent to"),
                                         "value"=>""
                                         ),
-                   /*T*/"Actions"/*/T*/ => array (
+                   lang("Actions") => array (
                                         "type"=>"hidden",
-                                        "description"=>/*T*/"Current actions that are active for this plugin per server"/*/T*/,
+                                        "description"=>lang("Current actions that are active for this plugin per server"),
                                         "value"=>"Create,Delete,Suspend,UnSuspend"
                                        ),
-                    /*T*/'reseller'/*/T*/  => array(
+                    lang('reseller')  => array(
                                         'type'          => 'hidden',
-                                        'description'   => /*T*/'Whether this server plugin can set reseller accounts'/*/T*/,
+                                        'description'   => lang('Whether this server plugin can set reseller accounts'),
                                         'value'         => '1',
                                        ),
-                    /*T*/'reseller-fieldset'/*/T*/  => array(
+                    lang('reseller-fieldset')  => array(
                                         'type'          => 'fieldset',
                                         'name'          => 'reseller-fieldset',
-                                        'label'   => /*T*/'Reseller Account Specific Fields'/*/T*/,
-                                        'description'   => /*T*/''/*/T*/,
+                                        'label'   => lang('Reseller Account Specific Fields'),
+                                        'description'   => '',
                                         'value'         => '1',
                                        ),
-                    /*T*/'reseller_acl_fields'/*/T*/ => array(
+                    lang('reseller_acl_fields') => array(
                                         'type'          => 'hidden',
-                                        'description'   => /*T*/'ACL field for reseller account'/*/T*/,
+                                        'description'   => lang('ACL field for reseller account'),
                                         'value'         => array(
-                                                                array('name' => 'acl-name', 'type' => 'text', 'label' => 'Reseller ACL Name', 'description' => /*T*/'If you have a predefined ACL List in WHM you wish to use, enter it here.'/*/T*/, 'belongsto' => 'reseller-fieldset'),
-								array('name' => 'acl-rslimit-disk', 'type' => 'text', 'label' => 'Disk space in MB', 'description' => /*T*/'If you wish to set Disk space AND Bandwitdh as unlimited, leave this field empty.  Note: If you wish to limit Bandwidth but not Disk Space, enter a very large number here'/*/T*/, 'belongsto' => 'reseller-fieldset'),
+                                                                array('name' => 'acl-name', 'type' => 'text', 'label' => 'Reseller ACL Name', 'description' => lang('If you have a predefined ACL List in WHM you wish to use, enter it here.'), 'belongsto' => 'reseller-fieldset'),
+								array('name' => 'acl-rslimit-disk', 'type' => 'text', 'label' => 'Disk space in MB', 'description' => lang('If you wish to set Disk space AND Bandwitdh as unlimited, leave this field empty.  Note: If you wish to limit Bandwidth but not Disk Space, enter a very large number here'), 'belongsto' => 'reseller-fieldset'),
 								array('name' => 'acl-rsolimit-disk', 'type' => 'check', 'label' => 'Disk space overselling allowed' , 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-rslimit-bw', 'type' => 'text', 'label' => /*T*/'Bandwidth in MB'/*/T*/, 'description' => /*T*/'If you wish to set Disk space AND Bandwitdh as unlimited, leave this field empty.  Note: If you wish to limit Disk Space but not Bandwidth, enter a very large number here'/*T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-rsolimit-bw', 'type' => 'check', 'label' => /*T*/'Bandwidth overselling allowed'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-domain-quota', 'type' => 'text', 'label' => /*T*/'Domain quota'/*/T*/, 'belongsto' => 'reseller-fieldset'  ),
-								array('name' => 'acl-list-accts', 'type' => 'check', 'label' => /*T*/'List Accounts'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-show-bandwidth', 'type' => 'check', 'label' => /*T*/'View Account Bandwidth Usage'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-create-acct', 'type' => 'check', 'label' => /*T*/'Account Creation'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-edit-account', 'type' => 'check', 'label' => /*T*/'Account Modification'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-suspend-acct', 'type' => 'check', 'label' => /*T*/'Account Suspension'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-kill-acct', 'type' => 'check', 'label' => /*T*/'Acccount Termination'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-upgrade-account', 'type' => 'check', 'label' => /*T*/'Account Upgrades'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-limit-bandwidth', 'type' => 'check', 'label' => /*T*/'Bandwidth Limiting Modification'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-edit-mx', 'type' => 'check', 'label' => /*T*/'Edit MX Entries'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-frontpage', 'type' => 'check', 'label' => /*T*/'Enabling/Disabling FrontPage Extensions'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-mod-subdomains', 'type' => 'check', 'label' => /*T*/'Enabling/Disabling SubDomains'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-passwd', 'type' => 'check', 'label' => /*T*/'Password Modification'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-quota', 'type' => 'check', 'label' => /*T*/'Quota Modification'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-res-cart', 'type' => 'check', 'label' => /*T*/'Reset Shopping Cart'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-ssl-gencrt', 'type' => 'check', 'label' => /*T*/'SSL CSR/CRT Generator'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-ssl', 'type' => 'check', 'label' => /*T*/'SSL Site Management'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-demo-setup', 'type' => 'check', 'label' => /*T*/'Turn an account into a demo account'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-rearrange-accts', 'type' => 'check', 'label' => /*T*/'Rearrange Accounts'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-clustering', 'type' => 'check', 'label' => /*T*/'Clustering'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-create-dns', 'type' => 'check', 'label' => /*T*/'Add DNS'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-edit-dns', 'type' => 'check', 'label' => /*T*/'Edit DNS'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-park-dns', 'type' => 'check', 'label' => /*T*/'Park DNS'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-kill-dns', 'type' => 'check', 'label' => /*T*/'Remove DNS'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-add-pkg', 'type' => 'check', 'label' => /*T*/'Add/Remove Packages'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-edit-pkg', 'type' => 'check', 'label' => /*T*/'Edit Packages'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-add-pkg-shell', 'type' => 'check', 'label' => /*T*/'Allow Creation of Packages With Shell Access'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-allow-unlimited-disk-pkgs', 'type' => 'check' , 'label' => /*T*/'Allow Creation of Packages with Unlimited Diskspace'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-allow-unlimited-pkgs', 'type' => 'check' , 'label' => /*T*/'Allow Creation of Packages with Unlimited Features'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-add-pkg-ip', 'type' => 'check', 'label' => /*T*/'Allow Creation of Packages With a Dedicated IP'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-allow-addoncreate', 'type' => 'check' , 'label' => /*T*/'Allow Creation of Packages with Addon Domains'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-allow-parkedcreate', 'type' => 'check', 'label' => /*T*/'Allow Creation of Packages With Parked Domains'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-onlyselfandglobalpkgs', 'type' => 'check' , 'label' => /*T*/'Allow creation of accounts with packages that are global or owned by this user'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-disallow-shell', 'type' => 'check', 'label' => /*T*/'Never allow creation of accounts with shell access'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-stats', 'type' => 'check', 'label' => /*T*/'View Account Statistics'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-status', 'type' => 'check', 'label' => /*T*/'View Server Status'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-restart', 'type' => 'check', 'label' => /*T*/'Restart Services'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-mailcheck', 'type' => 'check', 'label' => /*T*/'Mail Trouble Shooter'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-restftp', 'type' => 'check', 'label' => /*T*/'Resync Ftp Passwords'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
-								array('name' => 'acl-news', 'type' => 'check', 'label' => /*T*/'News Modification'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-rslimit-bw', 'type' => 'text', 'label' => lang('Bandwidth in MB'), 'description' => lang('If you wish to set Disk space AND Bandwitdh as unlimited, leave this field empty.  Note: If you wish to limit Disk Space but not Bandwidth, enter a very large number here'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-rsolimit-bw', 'type' => 'check', 'label' => lang('Bandwidth overselling allowed'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-domain-quota', 'type' => 'text', 'label' => lang('Domain quota'), 'belongsto' => 'reseller-fieldset'  ),
+								array('name' => 'acl-list-accts', 'type' => 'check', 'label' => lang('List Accounts'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-show-bandwidth', 'type' => 'check', 'label' => lang('View Account Bandwidth Usage'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-create-acct', 'type' => 'check', 'label' => lang('Account Creation'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-edit-account', 'type' => 'check', 'label' => lang('Account Modification'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-suspend-acct', 'type' => 'check', 'label' => lang('Account Suspension'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-kill-acct', 'type' => 'check', 'label' => lang('Acccount Termination'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-upgrade-account', 'type' => 'check', 'label' => lang('Account Upgrades'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-limit-bandwidth', 'type' => 'check', 'label' => lang('Bandwidth Limiting Modification'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-edit-mx', 'type' => 'check', 'label' => lang('Edit MX Entries'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-frontpage', 'type' => 'check', 'label' => lang('Enabling/Disabling FrontPage Extensions'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-mod-subdomains', 'type' => 'check', 'label' => lang('Enabling/Disabling SubDomains'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-passwd', 'type' => 'check', 'label' => lang('Password Modification'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-quota', 'type' => 'check', 'label' => lang('Quota Modification'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-res-cart', 'type' => 'check', 'label' => lang('Reset Shopping Cart'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-ssl-gencrt', 'type' => 'check', 'label' => lang('SSL CSR/CRT Generator'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-ssl', 'type' => 'check', 'label' => lang('SSL Site Management'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-demo-setup', 'type' => 'check', 'label' => lang('Turn an account into a demo account'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-rearrange-accts', 'type' => 'check', 'label' => lang('Rearrange Accounts'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-clustering', 'type' => 'check', 'label' => lang('Clustering'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-create-dns', 'type' => 'check', 'label' => lang('Add DNS'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-edit-dns', 'type' => 'check', 'label' => lang('Edit DNS'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-park-dns', 'type' => 'check', 'label' => lang('Park DNS'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-kill-dns', 'type' => 'check', 'label' => lang('Remove DNS'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-add-pkg', 'type' => 'check', 'label' => lang('Add/Remove Packages'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-edit-pkg', 'type' => 'check', 'label' => lang('Edit Packages'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-add-pkg-shell', 'type' => 'check', 'label' => lang('Allow Creation of Packages With Shell Access'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-allow-unlimited-disk-pkgs', 'type' => 'check' , 'label' => lang('Allow Creation of Packages with Unlimited Diskspace'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-allow-unlimited-pkgs', 'type' => 'check' , 'label' => lang('Allow Creation of Packages with Unlimited Features'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-add-pkg-ip', 'type' => 'check', 'label' => lang('Allow Creation of Packages With a Dedicated IP'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-allow-addoncreate', 'type' => 'check' , 'label' => lang('Allow Creation of Packages with Addon Domains'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-allow-parkedcreate', 'type' => 'check', 'label' => lang('Allow Creation of Packages With Parked Domains'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-onlyselfandglobalpkgs', 'type' => 'check' , 'label' => lang('Allow creation of accounts with packages that are global or owned by this user'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-disallow-shell', 'type' => 'check', 'label' => lang('Never allow creation of accounts with shell access'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-stats', 'type' => 'check', 'label' => lang('View Account Statistics'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-status', 'type' => 'check', 'label' => lang('View Server Status'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-restart', 'type' => 'check', 'label' => lang('Restart Services'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-mailcheck', 'type' => 'check', 'label' => lang('Mail Trouble Shooter'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-restftp', 'type' => 'check', 'label' => lang('Resync Ftp Passwords'), 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-news', 'type' => 'check', 'label' => lang('News Modification'), 'belongsto' => 'reseller-fieldset' ),
 								// keep this one last because it's too powerful, and better think about users security
-								array('name' => 'acl-all', 'type' => 'check', 'label' => /*T*/'All Features (root access)'/*/T*/, 'belongsto' => 'reseller-fieldset' ),
+								array('name' => 'acl-all', 'type' => 'check', 'label' => lang('All Features (root access)'), 'belongsto' => 'reseller-fieldset' ),
                                                         ),
                                        ),
-            /*T*/'package_addons'/*/T*/ => array(
+            lang('package_addons') => array(
                                         'type'          => 'hidden',
-                                        'description'   => /*T*/'Supported signup addons variables'/*/T*/,
+                                        'description'   => lang('Supported signup addons variables'),
                                         'value'         => array(
                                                                 'DISKSPACE', 'BANDWIDTH', 'SSL'
                                                                 ),
