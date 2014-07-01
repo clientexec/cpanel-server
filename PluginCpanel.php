@@ -691,9 +691,9 @@ class PluginCpanel extends ServerPlugin
         $serverURL = $schema . $host .':'. $port .'/login/';
 
         return array(
-            'link' => '<li><a href="#" onclick="$(\'#direct-link-form\').submit(); return false">' . $this->user->lang('Login to cPanel') . '</a></li>',
+            'link' => '<li><a href="#" onclick="$(\'#direct-link-form-cpanel\').submit(); return false">' . $this->user->lang('Login to cPanel') . '</a></li>',
             'form' =>
-                '<form action="' . $serverURL . '"; method="post" target="_blank" id="direct-link-form">
+                '<form action="' . $serverURL . '"; method="post" target="_blank" id="direct-link-form-cpanel">
                     <input type="hidden" name="user" value="' . $args['package']['username'] . '" />
                     <input type="hidden" name="pass" value="' . $args['package']['password'] . '" />
                 </form>'
