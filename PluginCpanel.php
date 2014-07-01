@@ -688,15 +688,14 @@ class PluginCpanel extends ServerPlugin
         $schema = ( $args['server']['variables']['plugin_cpanel_Use_SSL'] == true ) ? 'https://' : 'http://';
         $host = $args['server']['variables']['ServerHostName'];
         $port = ( $args['server']['variables']['plugin_cpanel_Use_SSL'] == true ) ? 2083 : 2082;
-        $serverURL = $schema . $host .':'. $port .'/login/';
+        $this->view->serverURL = $schema . $host .':'. $port .'/login/';
+        $this->view->username = $args['package']['username'];
+        $this->view->password = $args['package']['password'];
+        $form = $this->view->render('login.phtml');
 
         return array(
             'link' => '<li><a href="#" onclick="$(\'#direct-link-form-cpanel\').submit(); return false">' . $this->user->lang('Login to cPanel') . '</a></li>',
-            'form' =>
-                '<form action="' . $serverURL . '"; method="post" target="_blank" id="direct-link-form-cpanel">
-                    <input type="hidden" name="user" value="' . $args['package']['username'] . '" />
-                    <input type="hidden" name="pass" value="' . $args['package']['password'] . '" />
-                </form>'
+            'form' => $form
         );
     }
 }
