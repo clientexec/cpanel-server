@@ -84,7 +84,7 @@ class PluginCpanel extends ServerPlugin
                                         'type'          => 'hidden',
                                         'description'   => lang('ACL field for reseller account'),
                                         'value'         => array(
-                                                                array('name' => 'acl-name', 'type' => 'text', 'label' => 'Reseller ACL Name', 'description' => lang('If you have a predefined ACL List in WHM you wish to use, enter it here.'), 'belongsto' => 'reseller-fieldset'),
+                                array('name' => 'acl-name', 'type' => 'text', 'label' => 'Reseller ACL Name', 'description' => lang('If you have a predefined ACL List in WHM you wish to use, enter it here.'), 'belongsto' => 'reseller-fieldset'),
 								array('name' => 'acl-rslimit-disk', 'type' => 'text', 'label' => 'Disk space in MB', 'description' => lang('If you wish to set Disk space AND Bandwidth as unlimited, leave this field empty.  Note: If you wish to limit Bandwidth but not Disk Space, enter a very large number here'), 'belongsto' => 'reseller-fieldset'),
 								array('name' => 'acl-rsolimit-disk', 'type' => 'check', 'label' => 'Disk space overselling allowed' , 'belongsto' => 'reseller-fieldset' ),
 								array('name' => 'acl-rslimit-bw', 'type' => 'text', 'label' => lang('Bandwidth in MB'), 'description' => lang('If you wish to set Disk space AND Bandwidth as unlimited, leave this field empty.  Note: If you wish to limit Disk Space but not Bandwidth, enter a very large number here'), 'belongsto' => 'reseller-fieldset' ),
@@ -140,6 +140,24 @@ class PluginCpanel extends ServerPlugin
                                                                 'DISKSPACE', 'BANDWIDTH', 'SSL'
                                                                 ),
                                        ),
+             lang('package_vars_values') => array(
+                'type'          => 'hidden',
+                'description'   => lang('Hosting account parameters'),
+                'value'         => array(
+                    'dkim' => array(
+                        'type'           => 'check',
+                        'label'          =>'Enable DKIM?',
+                        'description'    => lang('Enable DKIM on this account.'),
+                        'value'          => '0',
+                    ),
+                    'spf' => array(
+                        'type'           => 'check',
+                        'label'          =>'Enable SPF?',
+                        'description'    => lang('Enable SPF on this account.'),
+                        'value'          => '0',
+                    ),
+                )
+            )
 	   );
 	   return $variables;
 	}
@@ -351,6 +369,14 @@ class PluginCpanel extends ServerPlugin
         $params['plan'] = urlencode($args['package']['name_on_server']);
         $params['password'] = $args['package']['password'];
         $params['contactemail'] = $args['customer']['email'];
+        $params['dkim'] = 0;
+        if ( isset($args['package']['variables']['dkim']) && $args['package']['variables']['dkim'] == 1 ) {
+            $params['dkim'] = 1;
+        }
+        $params['spf'] = 0;
+        if ( isset($args['package']['variables']['spf']) && $args['package']['variables']['spf'] == 1 ) {
+            $params['spf'] = 1;
+        }
 
         $userPackage = new UserPackage($args['package']['id']);
         $userPackage->setCustomField('User Name', $params['username']);
