@@ -717,10 +717,11 @@ class PluginCpanel extends ServerPlugin
         $this->view->serverURL = $schema . $host .':'. $port .'/login/';
         $this->view->username = $args['package']['username'];
         $this->view->password = $args['package']['password'];
+        $this->view->packageId = $userPackage->id;
         $form = $this->view->render('login.phtml');
 
         return array(
-            'link' => '<li><a href="#" onclick="$(\'#direct-link-form-cpanel\').submit(); return false">' . $this->user->lang('Login to cPanel') . '</a></li>',
+            'link' => '<li><a href="#" onclick="$(\'#direct-link-form-cpanel-' . $userPackage->id . '\').submit(); return false">' . $this->user->lang('Login to cPanel') . '</a></li>',
             'form' => $form
         );
     }
