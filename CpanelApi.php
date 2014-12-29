@@ -54,7 +54,7 @@ class CpanelApi
 			throw new CE_Exception('cURL is required in order to connect to cPanel');
 		}
 
-		$this->url = $url = $this->schema . $this->host .':'. $this->port .'/json-api/' . $function . $this->build($params);
+		$this->url = $url = $this->schema . $this->host .':'. $this->port .'/json-api/' . $function;
 
 		$ch = curl_init ( $url );
 		curl_setopt ( $ch, CURLOPT_SSL_VERIFYHOST, false );
@@ -62,6 +62,8 @@ class CpanelApi
 		curl_setopt ( $ch, CURLOPT_RETURNTRANSFER, true );
 		curl_setopt ( $ch, CURLOPT_CONNECTTIMEOUT, 3 );
 		curl_setopt ( $ch, CURLOPT_HEADER, false );
+		curl_setopt ( $ch, CURLOPT_POST, 1);
+		curl_setopt ( $ch, CURLOPT_POSTFIELDS, $params);
 
 		$headers = array();
 		$headers[0] = "Authorization: WHM {$this->username}:" . preg_replace("'(\r|\n)'","",$this->hash);
