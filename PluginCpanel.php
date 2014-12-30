@@ -436,7 +436,7 @@ class PluginCpanel extends ServerPlugin
 
 
                 case 'password':
-                    $request = $this->api->call('passwd', array('user' => $args['package']['username'], 'pass' => urlencode($value)));
+                    $request = $this->api->call('passwd', array('user' => $args['package']['username'], 'pass' => $value));
                     // passwd has a different json struct.
                     if ( $request->passwd[0]->status != 1 ) {
                         $errors[] = $this->email_error('Password Change', $request->passwd[0]->statusmsg, $args);
