@@ -693,6 +693,13 @@ class PluginCpanel extends ServerPlugin
         $this->setup($args);
         $args = $this->updateArgs($args);
         $actions = array();
+
+        if ( $args['package']['username'] == '' ) {
+            // no username, so just pass create, and return
+            $actions[] = 'Create';
+            return $actions;
+        }
+
         try {
             $request = $this->api->call('accountsummary', array('user' => $args['package']['username']));
             $actions[] = 'Delete';
