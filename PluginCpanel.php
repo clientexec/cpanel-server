@@ -3,6 +3,7 @@
 require_once 'library/CE/NE_MailGateway.php';
 require_once 'modules/admin/models/ServerPlugin.php';
 require_once dirname(__FILE__).'/CpanelApi.php';
+require_once dirname(__FILE__).'/xmlapl.php';
 
 /**
  * cPanel Plugin for ClientExec
@@ -21,6 +22,7 @@ class PluginCpanel extends ServerPlugin
     );
 
     public $api;
+    public $xmlapi;
 
 	function getVariables()
 	{
@@ -170,6 +172,14 @@ class PluginCpanel extends ServerPlugin
     {
         if ( isset($args['server']['variables']['ServerHostName']) && isset($args['server']['variables']['plugin_cpanel_Username']) && isset($args['server']['variables']['plugin_cpanel_Access_Hash']) && isset($args['server']['variables']['plugin_cpanel_Use_SSL']) ) {
             $this->api = new CpanelApi($args['server']['variables']['ServerHostName'], $args['server']['variables']['plugin_cpanel_Username'], $args['server']['variables']['plugin_cpanel_Access_Hash'], $args['server']['variables']['plugin_cpanel_Use_SSL']);
+
+            // xmlapi, all new code should use this
+            $this->xmlapi = new xmlapi($args['server']['variables']['ServerHostName']);
+            $this->xmlapi->set_user($args['server']['variables']['plugin_cpanel_Username']);
+            $this->xmlapi->set_hash(preg_replace("'(\r|\n)'","", $args['server']['variables']['plugin_cpanel_Access_Hash']));
+            $port = ( $args['server']['variables']['plugin_cpanel_Use_SSL'] == true ) ? 2087 : 2086;
+            $this->xmlapi->set_port($port);
+
         } else {
             throw new CE_Exception('Missing Server Credentials: please fill out all information when editing the server.');
         }
