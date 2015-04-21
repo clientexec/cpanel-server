@@ -726,20 +726,24 @@ class PluginCpanel extends ServerPlugin
 
     function getDirectLink($userPackage)
     {
-        $args = $this->buildParams($userPackage);
+        $linkText = $this->user->lang('Login to cPanel');
 
-        $schema = ( $args['server']['variables']['plugin_cpanel_Use_SSL'] == true ) ? 'https://' : 'http://';
-        $host = $args['server']['variables']['ServerHostName'];
-        $port = ( $args['server']['variables']['plugin_cpanel_Use_SSL'] == true ) ? 2083 : 2082;
-        $this->view->serverURL = $schema . $host .':'. $port .'/login/';
-        $this->view->username = $args['package']['username'];
-        $this->view->password = $args['package']['password'];
-        $this->view->packageId = $userPackage->id;
-        $form = $this->view->render('login.phtml');
+        $args = $this->buildParams($userPackage);
+        $this->setup($args);
+
+        $params = array();
+        $params['user'] = $args['package']['username'];
+        $params['service'] = 'cpaneld';
+        if ( isset($args['package']['is_reseller']) && $args['package']['is_reseller']== 1 ) {
+            $params['service'] = 'whostmgrd';
+            $linkText = $this->user->lang('Login to WHM');
+        }
+        $params['api.version'] = '1';
+        $result = $this->api->call('create_user_session', $params);
 
         return array(
-            'link' => '<li><a href="#" onclick="$(\'#direct-link-form-cpanel-' . $userPackage->id . '\').submit(); return false">' . $this->user->lang('Login to cPanel') . '</a></li>',
-            'form' => $form
+            'link' => '<li><a target="_blank" href="' . $result->data->url .'">' .$linkText . '</a></li>',
+            'form' => ''
         );
     }
 }
