@@ -724,7 +724,7 @@ class PluginCpanel extends ServerPlugin
         return $actions;
     }
 
-    function getDirectLink($userPackage)
+    function getDirectLink($userPackage, $getRealLink = true)
     {
         $linkText = $this->user->lang('Login to cPanel');
 
@@ -739,11 +739,20 @@ class PluginCpanel extends ServerPlugin
             $linkText = $this->user->lang('Login to WHM');
         }
         $params['api.version'] = '1';
-        $result = $this->api->call('create_user_session', $params);
+        
+        if($getRealLink){
+            $result = $this->api->call('create_user_session', $params);
 
-        return array(
-            'link' => '<li><a target="_blank" href="' . $result->data->url .'">' .$linkText . '</a></li>',
-            'form' => ''
-        );
+            return array(
+                'link'    => '<li><a target="_blank" href="' . $result->data->url .'">' .$linkText . '</a></li>',
+                'rawlink' =>  $result->data->url,
+                'form'    => ''
+            );
+        }else{
+            return array(
+                'link' => '<li><a target="_blank" href="index.php?fuse=clients&controller=products&action=openpackagedirectlink&packageId='.$userPackage->getId().'&sessionHash='.CE_Lib::getSessionHash().'">' .$linkText . '</a></li>',
+                'form' => ''
+            );
+        }
     }
 }
