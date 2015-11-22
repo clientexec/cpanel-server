@@ -236,6 +236,18 @@ class PluginCpanel extends ServerPlugin
         return false;
     }
 
+    function getPackages($args)
+    {
+        $this->setup($args);
+        return $this->api->packages();
+    }
+
+    function getAccounts($args)
+    {
+        $this->setup($args);
+        return $this->xmlapi->listaccts();
+    }
+
     /**
      * Show views that might be specific to this plugin.
      * This content should be echoed out not returned
@@ -739,7 +751,7 @@ class PluginCpanel extends ServerPlugin
             $linkText = $this->user->lang('Login to WHM');
         }
         $params['api.version'] = '1';
-        
+
         if($getRealLink){
             $result = $this->api->call('create_user_session', $params);
 
