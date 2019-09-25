@@ -132,32 +132,32 @@
 class xmlapi
 {
     // should debugging statements be printed?
-    private $debug			= false;
+    private $debug          = false;
 
     // The host to connect to
-    private $host				=	'127.0.0.1';
+    private $host               =   '127.0.0.1';
 
     // the port to connect to
-    private $port				=	'2087';
+    private $port               =   '2087';
 
     // should be the literal strings http or https
-    private $protocol		=	'https';
+    private $protocol       =   'https';
 
     // output that should be given by the xml-api
-    private $output		=	'simplexml';
+    private $output     =   'simplexml';
 
     // literal strings hash or password
-    private $auth_type 	= null;
+    private $auth_type  = null;
 
     //  the actual password or hash
-    private $auth 			= null;
+    private $auth           = null;
 
     // username to authenticate as
-    private $user				= null;
+    private $user               = null;
 
     // The HTTP Client to use
 
-    private $http_client		= 'curl';
+    private $http_client        = 'curl';
 
     /**
     * Instantiate the XML-API Object
@@ -206,7 +206,6 @@ class xmlapi
                 && ( ( defined('XMLAPI_PASS') ) && ( strlen(XMLAPI_PASS) > 0 ) ) ) {
                 error_log('warning: both XMLAPI_HASH and XMLAPI_PASS are defined, defaulting to XMLAPI_HASH');
             }
-
 
             // Throw a warning if XMLAPI_HASH and XMLAPI_PASS are undefined and XMLAPI_USER is defined
             if ( !(defined('XMLAPI_HASH') ) || !defined('XMLAPI_PASS') ) {
@@ -609,9 +608,9 @@ class xmlapi
     }
 
      /*
-    *	Query Functions
-    *	--
-    *	This is where the actual calling of the XML-API, building API1 & API2 calls happens
+    *   Query Functions
+    *   --
+    *   This is where the actual calling of the XML-API, building API1 & API2 calls happens
     */
 
     /**
@@ -679,7 +678,7 @@ class xmlapi
         }
 
         /*
-        *	Post-Query Block
+        *   Post-Query Block
         * Handle response, return proper data types, debug, etc
         */
 
@@ -706,7 +705,6 @@ class xmlapi
             return;
         }
 
-
         // perform simplexml transformation (array relies on this)
         if ( ($this->output == 'simplexml') || $this->output == 'array') {
             $response = simplexml_load_string($response, null, LIBXML_NOERROR | LIBXML_NOWARNING);
@@ -726,6 +724,10 @@ class xmlapi
             if ($this->debug) {
                 error_log("Associative Array var_dump:\n" . print_r($response, true));
             }
+        }
+
+        if ($this->output == 'json') {
+            $response = json_decode($response);
         }
 
         return $response;
@@ -795,7 +797,7 @@ class xmlapi
         $data = ( (!$recurse) && is_string($input) ) ? simplexml_load_string($input) : $input;
         // Convert SimpleXMLElements to array
         if ($data instanceof SimpleXMLElement) {
-            $data = (array) $data;
+            $data = (array)$data;
         }
         // Recurse into arrays
         if (is_array($data)) {
@@ -941,9 +943,9 @@ class xmlapi
     *
     * This function will allow one to create an account, the $acctconf parameter requires that the follow
     * three associations are defined:
-    *	- username
-    *	- password
-    *	- domain
+    *   - username
+    *   - password
+    *   - domain
     *
     * Failure to prive these will cause an error to be logged.  Any other key/value pairs as defined by the createaccount call
     * documentation are allowed parameters for this call.
@@ -1049,7 +1051,7 @@ class xmlapi
             return false;
         }
         $args['user'] = $username;
-        if (sizeof($args) < 2) {
+        if (count($args) < 2) {
             error_log("modifyacct requires that at least one attribute is passed to it");
 
             return false;
@@ -1083,12 +1085,12 @@ class xmlapi
     * Return a summary of the account's information
     *
     * This call will return a brief report of information about an account, such as:
-    *	- Disk Limit
-    *	- Disk Used
-    *	- Domain
-    *	- Account Email
-    *	- Theme
-    * 	- Start Data
+    *   - Disk Limit
+    *   - Disk Used
+    *   - Domain
+    *   - Account Email
+    *   - Theme
+    *   - Start Data
     *
     * Please see the XML API Call documentation for more information on what is returned by this call
     *
@@ -1748,7 +1750,7 @@ class xmlapi
             $params['ip'] = $ip;
         }
 
-        return $this->xmlapi_query('setresellerips',$params);
+        return $this->xmlapi_query('setresellerips', $params);
     }
 
     /**
@@ -1772,7 +1774,7 @@ class xmlapi
             return false;
         }
 
-        return $this->xmlapi_query('setresellerlimits',$reseller_cfg);
+        return $this->xmlapi_query('setresellerlimits', $reseller_cfg);
     }
 
     /**
@@ -2188,7 +2190,7 @@ class xmlapi
     * @link http://docs.cpanel.net/twiki/bin/view/AllDocumentation/AutomationIntegration/ServiceStatus XML API Call documentation
     */
     public function servicestatus($args=array())
-     {
+    {
         if (!empty($args) && !is_array($args)) {
             $args = array('service'=>$args);
         } elseif (!is_array($args)) {
@@ -2196,7 +2198,7 @@ class xmlapi
         }
 
         return $this->xmlapi_query('servicestatus', $args);
-     }
+    }
 
     /**
     * Configure A Service
@@ -2323,7 +2325,7 @@ class xmlapi
 
             return false;
         }
-        if (is_array($args) && (sizeof($args) < 3)) {
+        if (is_array($args) && (count($args) < 3)) {
             error_log("addpop requires that args at least contains an email_username, email_password and email_domain");
 
             return false;
@@ -2455,7 +2457,7 @@ class xmlapi
             return false;
         }
         if (is_array($args)) {
-        $display = '';
+            $display = '';
             foreach ($args as $key => $value) {
                 $display .= $value . '|';
             }

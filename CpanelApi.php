@@ -112,7 +112,7 @@ class CpanelApi
 
         $queryString = array();
         foreach ( $params as $k => $v ) {
-             $queryString[] = $k .'='. $v;
+             $queryString[] = $k .'='. urlencode($v);
         }
 
         return '?'.implode('&', $queryString);

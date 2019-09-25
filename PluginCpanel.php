@@ -36,16 +36,16 @@ class PluginCpanel extends ServerPlugin
                    lang("Description") => array (
                                         "type"=>"hidden",
                                         "description"=>lang("Description viewable by admin in server settings"),
-                                        "value"=>lang("CPanel control panel integration")
+                                        "value"=>lang("cPanel control panel integration")
                                        ),
                    lang("Username") => array (
                                         "type"=>"text",
-                                        "description"=>lang("Username used to connect to server"),
+                                        "description"=>lang("WHM Username"),
                                         "value"=>""
                                        ),
                    lang("Access Hash") => array (
                                         "type"=>"textarea",
-                                        "description"=>lang("Password used to connect to server"),
+                                        "description"=>lang("API Token"),
                                         "value"=>"",
                                         "encryptable"=>true
                                        ),
@@ -162,9 +162,9 @@ class PluginCpanel extends ServerPlugin
      * Sets up the CpanelApi object in order to make requests to the server.
      * @param <type> $args Standard set of arguments in order to make API request.
      */
-    public function setup ( $args )
+    public function setup($args)
     {
-        if ( isset($args['server']['variables']['ServerHostName']) && isset($args['server']['variables']['plugin_cpanel_Username']) && isset($args['server']['variables']['plugin_cpanel_Access_Hash']) && isset($args['server']['variables']['plugin_cpanel_Use_SSL']) ) {
+        if (isset($args['server']['variables']['ServerHostName']) && isset($args['server']['variables']['plugin_cpanel_Username']) && isset($args['server']['variables']['plugin_cpanel_Access_Hash']) && isset($args['server']['variables']['plugin_cpanel_Use_SSL'])) {
             $this->api = new CpanelApi($args['server']['variables']['ServerHostName'], $args['server']['variables']['plugin_cpanel_Username'], $args['server']['variables']['plugin_cpanel_Access_Hash'], $args['server']['variables']['plugin_cpanel_Use_SSL']);
 
             // xmlapi, all new code should use this
@@ -173,7 +173,7 @@ class PluginCpanel extends ServerPlugin
             $this->xmlapi->set_hash(preg_replace("'(\r|\n)'", "", $args['server']['variables']['plugin_cpanel_Access_Hash']));
             $port = ( $args['server']['variables']['plugin_cpanel_Use_SSL'] == true ) ? 2087 : 2086;
             $this->xmlapi->set_port($port);
-
+            $this->xmlapi->set_output('json');
         } else {
             throw new CE_Exception('Missing Server Credentials: please fill out all information when editing the server.');
         }
@@ -186,15 +186,15 @@ class PluginCpanel extends ServerPlugin
      * @param Array $args
      * @return string
      */
-    function email_error ( $name, $message, $args )
+    function email_error($name, $message, $args)
     {
         $error = "cPanel Account ".$name." Failed. ";
         if (trim($args['server']['variables']['plugin_cpanel_Failure_E-mail'])) {
             $error .= "An email with the Details was sent to ". $args['server']['variables']['plugin_cpanel_Failure_E-mail'].".\n";
         }
 
-        if ( is_array($message) ) {
-            $message = implode ( "\n", trim($message) );
+        if (is_array($message)) {
+            $message = implode("\n", trim($message));
         }
 
         // remove access hash from e-mails
@@ -202,14 +202,16 @@ class PluginCpanel extends ServerPlugin
 
         CE_Lib::log(1, 'cPanel Error: '.print_r(array('type' => $name, 'error' => $error, 'message' => $message, 'params' => $args), true));
 
-        if ( !empty($args['server']['variables']['plugin_cpanel_Failure_E-mail']) ) {
+        if (!empty($args['server']['variables']['plugin_cpanel_Failure_E-mail'])) {
             $mailGateway = new NE_MailGateway();
-            $mailGateway->mailMessageEmail( $message,
+            $mailGateway->mailMessageEmail(
+                $message,
                 $args['server']['variables']['plugin_cpanel_Failure_E-mail'],
                 "Cpanel Plugin",
                 $args['server']['variables']['plugin_cpanel_Failure_E-mail'],
                 "",
-                "Cpanel Account ".$name." Failure");
+                "Cpanel Account ".$name." Failure"
+            );
         }
         return $error.nl2br($message);
     }
@@ -224,7 +226,7 @@ class PluginCpanel extends ServerPlugin
     {
         $this->setup($args);
         $packages = $this->api->packages();
-        if ( is_array($packages) && isset($packages[$plan]) ) {
+        if (is_array($packages) && isset($packages[$plan])) {
             return true;
         }
         return false;
@@ -311,17 +313,23 @@ class PluginCpanel extends ServerPlugin
             $errors[] = 'Domain username can\'t contain periods';
         }
 
+        // Username cannot contain a @
+        if (strpos($args['package']['username'], "@") !== false) {
+            $args['package']['username'] = str_replace("@", "", $args['package']['username']);
+            $errors[] = 'Domain username can\'t contain @';
+        }
+
         // Username cannot be greater than 16 characters (if database prefixing is on in WHM, then it is only 8)
         if (strlen($args['package']['username']) > 16) {
             $args['package']['username'] = mb_substr($args['package']['username'], 0, 16);
-        } else if ( strlen(trim($args['package']['username'])) <= 0 ) {
+        } elseif (strlen(trim($args['package']['username'])) <= 0) {
             $errors[] = 'The cPanel username is blank.';
-        } else if ( strlen(trim($args['package']['password'])) <= 0 ) {
+        } elseif (strlen(trim($args['package']['password'])) <= 0) {
             $errors[] = 'The cPanel password is blank';
         }
 
         // Only make the request if there have been no errors so far.
-        if ( count($errors) == 0 ) {
+        if (count($errors) == 0) {
             if (strpos($args['package']['password'], $args['package']['username']) !== false) {
                 $errors[] = 'Domain password can\'t contain domain username';
             }
@@ -331,8 +339,7 @@ class PluginCpanel extends ServerPlugin
         if (isset($args['noError'])) {
             return $args['package']['username'];
         } else {
-
-            if ( count($errors) > 0 ) {
+            if (count($errors) > 0) {
                 CE_Lib::log(4, "plugin_cpanel::validate::error: ".print_r($errors, true));
                 throw new CE_Exception($errors[0]);
             }
@@ -353,40 +360,40 @@ class PluginCpanel extends ServerPlugin
         $this->setup($args);
         $errors = array();
 
-        if ( $args['package']['name_on_server'] == null ) {
+        if ($args['package']['name_on_server'] == null) {
             throw new CE_Exception("This package is not configured properly.  Missing 'Package Name on Server'.");
         }
 
         // package add-ons handling
-        if ( isset($args['package']['addons']['DISKSPACE']) ) {
+        if (isset($args['package']['addons']['DISKSPACE'])) {
             @$args['package']['acl']['acl-rslimit-disk'] += ((int)$args['package']['addons']['DISKSPACE']);
         }
-        if ( isset($args['package']['addons']['BANDWIDTH']) ) {
+        if (isset($args['package']['addons']['BANDWIDTH'])) {
             @$args['package']['acl']['acl-rslimit-bw'] += ((int)$args['package']['addons']['BANDWIDTH']) * 1024; // Convert from Gigs to MB
         }
-        if ( isset($args['package']['is_reseller']) && isset($args['package']['addons']['SSL']) && $args['package']['addons']['SSL'] == 1) {
+        if (isset($args['package']['is_reseller']) && isset($args['package']['addons']['SSL']) && $args['package']['addons']['SSL'] == 1) {
             $args['package']['acl']['acl-ssl'] = 1;
         }
 
         // Checks if the plan exists.
-        if ( !$this->CheckCpanelPlan($args['package']['name_on_server'], $args) ) {
+        if (!$this->CheckCpanelPlan($args['package']['name_on_server'], $args)) {
             $error = "The package '{$args['package']['name_on_server']}' is not available in WHM.  Make sure you can use this package in WHM, or that the resources are not set to unlimited if your host has this disabled.";
-            $errors[] = $this->email_error('Creation', $error, $args );
+            $errors[] = $this->email_error('Creation', $error, $args);
             throw new CE_Exception($error);
         }
 
         $params = array();
         $params['username'] = $args['package']['username'];
         $params['domain'] = $args['package']['domain_name'];
-        $params['plan'] = urlencode($args['package']['name_on_server']);
+        $params['plan'] = $args['package']['name_on_server'];
         $params['password'] = urlencode($args['package']['password']);
         $params['contactemail'] = $args['customer']['email'];
         $params['dkim'] = 0;
-        if ( isset($args['package']['variables']['dkim']) && $args['package']['variables']['dkim'] == 1 ) {
+        if (isset($args['package']['variables']['dkim']) && $args['package']['variables']['dkim'] == 1) {
             $params['dkim'] = 1;
         }
         $params['spf'] = 0;
-        if ( isset($args['package']['variables']['spf']) && $args['package']['variables']['spf'] == 1 ) {
+        if (isset($args['package']['variables']['spf']) && $args['package']['variables']['spf'] == 1) {
             $params['spf'] = 1;
         }
 
@@ -394,18 +401,18 @@ class PluginCpanel extends ServerPlugin
         $userPackage->setCustomField('User Name', $params['username']);
 
         // Check if we need to set a dedicated IP
-        if ( $userPackage->getCustomField('Shared') == '0' ) {
+        if ($userPackage->getCustomField('Shared') == '0') {
             $params['ip'] = 'yes';
             $params['customip'] = $args['package']['ip'];
         }
 
         $request = $this->api->call('createacct', $params);
 
-        if ( $request->result[0]->status != 1 ) {
+        if ($request->result[0]->status != 1) {
             $errors[] = $this->email_error('Creation', $request->result[0]->statusmsg, $args);
-        } else if ( $request->result[0]->status == 1 ) {
+        } elseif ($request->result[0]->status == 1) {
             // setup the reseller permissions if necessary
-            if ( isset($args['package']['is_reseller']) && $args['package']['is_reseller']== 1 ) {
+            if (isset($args['package']['is_reseller']) && $args['package']['is_reseller']== 1) {
                 $this->_addReseller($args);
                 $this->_setResellerACLs($args);
             }
@@ -413,9 +420,9 @@ class PluginCpanel extends ServerPlugin
             $errors[] = "Error connecting to cPanel server";
         }
 
-        if ( count($errors) > 0 ) {
+        if (count($errors) > 0) {
             CE_Lib::log(4, "plugin_cpanel::create::error: ".print_r($errors, true));
-            throw new CE_Exception ( $errors[0] );
+            throw new CE_Exception($errors[0]);
         }
         return;
     }
@@ -434,10 +441,10 @@ class PluginCpanel extends ServerPlugin
         $errors = array();
         // Loop over changes array
         foreach ($args['changes'] as $key => $value) {
-            switch ( $key )  {
+            switch ($key) {
                 case 'username':
                     $request = $this->api->call('modifyacct', array('user' => $args['package']['username'], 'newuser' => $value));
-                    if ( $request->result[0]->status != 1 ) {
+                    if ($request->result[0]->status != 1) {
                         $errors[] = $this->email_error('Username Change', $request->result[0]->statusmsg, $args);
                     }
                     // Internal fix, incase we are also changing the domain name.
@@ -447,14 +454,14 @@ class PluginCpanel extends ServerPlugin
                 case 'password':
                     $request = $this->api->call('passwd', array('user' => $args['package']['username'], 'pass' => $value));
                     // passwd has a different json struct.
-                    if ( $request->passwd[0]->status != 1 ) {
+                    if ($request->passwd[0]->status != 1) {
                         $errors[] = $this->email_error('Password Change', $request->passwd[0]->statusmsg, $args);
                     }
                     break;
 
                 case 'domain':
                     $request = $this->api->call('modifyacct', array('user' => $args['package']['username'], 'domain' => $value));
-                    if ( $request->result[0]->status != 1 ) {
+                    if ($request->result[0]->status != 1) {
                         $errors[] = $this->email_error('Domain Change', $request->result[0]->statusmsg, $args);
                     }
                     $args['package']['domain_name'] = $value;
@@ -462,31 +469,31 @@ class PluginCpanel extends ServerPlugin
 
                 case 'ip':
                     $request = $this->api->call('setsiteip', array('user' => $args['package']['username'], 'ip' => $value));
-                    if ( $request->result[0]->status != 1 ) {
+                    if ($request->result[0]->status != 1) {
                         $errors[] = $this->email_error('IP Change', $request->result[0]->statusmsg, $args);
                     }
                     break;
 
                 case 'package':
-                    if ( !$this->CheckCpanelPlan($args['package']['name_on_server'], $args) ) {
+                    if (!$this->CheckCpanelPlan($args['package']['name_on_server'], $args)) {
                         $error = "The package '{$args['package']['name_on_server']}' was not found on the server.";
-                        $errors[] = $this->email_error('Creation', $error, $args );
+                        $errors[] = $this->email_error('Creation', $error, $args);
                         throw new CE_Exception($error);
                     }
 
                     $request = $this->api->call('changepackage', array('user' => $args['package']['username'], 'pkg' => urlencode($args['package']['name_on_server'])));
-                    if ( $request->result[0]->status != 1 ) {
+                    if ($request->result[0]->status != 1) {
                         $errors[] = $this->email_error('Plan Change', $request->result[0]->statusmsg, $args);
                     } else {
                         // setup or delete the reseller permissions if necessary
-                        if ( isset($args['package']['is_reseller']) && $args['package']['is_reseller'] == 1 ) {
-                            if ( !isset($args['changes']['leave_reseller']) ) {
+                        if (isset($args['package']['is_reseller']) && $args['package']['is_reseller'] == 1) {
+                            if (!isset($args['changes']['leave_reseller'])) {
                                 $this->_addReseller($args);
                                 $this->_setResellerACLs($args);
                             }
                         } else {
                             // If the old package was a reseller, we need to remove it.
-                            if ( isset($args['changes']['remove_reseller']) && $args['changes']['remove_reseller'] == 1 ) {
+                            if (isset($args['changes']['remove_reseller']) && $args['changes']['remove_reseller'] == 1) {
                                 $this->_removeReseller($args);
                             }
                         }
@@ -495,9 +502,9 @@ class PluginCpanel extends ServerPlugin
             }
         }
 
-        if ( count($errors) > 0 ) {
+        if (count($errors) > 0) {
             CE_Lib::log(4, "plugin_cpanel::update::error: ".print_r($errors, true));
-            throw new CE_Exception ( $errors[0] );
+            throw new CE_Exception($errors[0]);
         }
     }
 
@@ -512,15 +519,24 @@ class PluginCpanel extends ServerPlugin
     {
         $this->setup($args);
         $args = $this->updateArgs($args);
-        $request = $this->api->call('removeacct', array('user' => $args['package']['username']));
 
-        if ( $request->result[0]->status != 1 ) {
-            $error = $this->email_error ( 'Deletion', $request->result[0]->statusmsg, $args );
+        if (isset($args['package']['is_reseller'])) {
+            $request = $this->api->call('terminatereseller', [
+                'user' => $args['package']['username'],
+                'terminatereseller' => 1,
+                'verify' => 'I understand this will irrevocably remove all the accounts owned by the reseller '
+            ]);
+        } else {
+            $request = $this->api->call('removeacct', ['user' => $args['package']['username']]);
         }
 
-        if ( isset($error) ) {
+        if ($request->result[0]->status != 1) {
+            $error = $this->email_error('Deletion', $request->result[0]->statusmsg, $args);
+        }
+
+        if (isset($error)) {
             CE_Lib::log(4, "plugin_cpanel::delete::error: ".$error);
-            throw new CE_Exception ( $error );
+            throw new CE_Exception($error);
         }
     }
 
@@ -538,13 +554,13 @@ class PluginCpanel extends ServerPlugin
         $action = ( isset($args['package']['is_reseller']) ) ? 'suspendreseller' : 'suspendacct';
         $request = $this->api->call($action, array('user' => $args['package']['username']));
 
-        if ( $request->result[0]->status != 1 ) {
-            $error = $this->email_error( 'Suspension', $request->result[0]->statusmsg, $args );
+        if ($request->result[0]->status != 1) {
+            $error = $this->email_error('Suspension', $request->result[0]->statusmsg, $args);
         }
 
-        if ( isset($error) ) {
+        if (isset($error)) {
             CE_Lib::log(4, "plugin_cpanel::suspend::error: ".$error);
-            throw new CE_Exception ( $error );
+            throw new CE_Exception($error);
         }
     }
 
@@ -562,13 +578,13 @@ class PluginCpanel extends ServerPlugin
         $action = ( isset($args['package']['is_reseller']) ) ? 'unsuspendreseller' : 'unsuspendacct';
         $request = $this->api->call($action, array('user' => $args['package']['username']));
 
-        if ( $request->result[0]->status != 1 ) {
-            $error = $this->email_error ( 'Unsuspension', $request->result[0]->statusmsg, $args );
+        if ($request->result[0]->status != 1) {
+            $error = $this->email_error('Unsuspension', $request->result[0]->statusmsg, $args);
         }
 
-        if ( isset($error) ) {
+        if (isset($error)) {
             CE_Lib::log(4, "plugin_cpanel::unsuspend::error: ".$error);
-            throw new CE_Exception ( $error );
+            throw new CE_Exception($error);
         }
     }
 
@@ -576,8 +592,8 @@ class PluginCpanel extends ServerPlugin
     {
         CE_Lib::log(4, 'Testing connection to cPanel server');
         $this->setup($args);
-        $version = $this->api->version();
-        if ( strlen(trim($version)) == 0 ) {
+        $response = $this->api->packages();
+        if (count($response) == 0) {
             throw new CE_Exception("Connection to server failed.");
         }
     }
@@ -589,28 +605,28 @@ class PluginCpanel extends ServerPlugin
         $resourceLimits = array('acl-rslimit-disk', 'acl-rsolimit-disk', 'acl-rslimit-bw', 'acl-rsolimit-bw', 'acl-domain-quota');
 
         $acls = array();
-        if ( isset($args['package']['acl']['acl-name'])&& $args['package']['acl']['acl-name'] != '' ) {
+        if (isset($args['package']['acl']['acl-name'])&& $args['package']['acl']['acl-name'] != '') {
             $acls['acllist'] = $args['package']['acl']['acl-name'];
         } else {
-            foreach ( $args['package']['acl'] as $key => $value ) {
-                if ( mb_substr ($key, 0, 4) == 'acl-' ) {
-                    if ( in_array($key, $resourceLimits) ) {
+            foreach ($args['package']['acl'] as $key => $value) {
+                if (mb_substr($key, 0, 4) == 'acl-') {
+                    if (in_array($key, $resourceLimits)) {
                         $key = mb_substr($key, 4);
                     }
                     $acls[$key] = $value;
                 }
             }
-            if ( (isset($args['package']['acl']['acl-rslimit-disk']) && $args['package']['acl']['acl-rslimit-disk']) || (isset($args['package']['acl']['acl-rslimit-bw']) && $args['package']['acl']['acl-rslimit-bw'])) {
+            if ((isset($args['package']['acl']['acl-rslimit-disk']) && $args['package']['acl']['acl-rslimit-disk']) || (isset($args['package']['acl']['acl-rslimit-bw']) && $args['package']['acl']['acl-rslimit-bw'])) {
                 $acls['resreslimit'] = 1;
             }
 
             // Only send ACLs that are set to 1.  Even if set to 0, cPanel still enables them.
-            foreach ( $acls as $key => $value ) {
-                if ( $value != '1' ) {
+            foreach ($acls as $key => $value) {
+                if ($value != '1') {
                     unset($acls[$key]);
                 }
                 // This key is for domain quota, which is sent as a seperate API call (setresellerlimits).
-                if ( $key == 'acl-domain-quota'  ) {
+                if ($key == 'acl-domain-quota') {
                     unset($acls[$key]);
                 }
             }
@@ -618,42 +634,42 @@ class PluginCpanel extends ServerPlugin
 
         $request = $this->api->call('setacls', array_merge(array('reseller' => $args['package']['username']), $acls));
 
-        if ( $request->result[0]->status != 1 ) {
+        if ($request->result[0]->status != 1) {
             $error = $request->result[0]->statusmsg . ' setacls';
-            $this->email_error ( 'Setup Reseller', $error, $args );
+            $this->email_error('Setup Reseller', $error, $args);
         }
 
         $tmpArgs = array();
 
         // Setup domain quota for the reseller
-        if ( (isset($args['package']['acl']['acl-domain-quota']) && $args['package']['acl']['acl-domain-quota'] > 0 ) ) {
+        if ((isset($args['package']['acl']['acl-domain-quota']) && $args['package']['acl']['acl-domain-quota'] > 0 )) {
             $tmpArgs['enable_account_limit'] = 1;
             $tmpArgs['account_limit'] = $args['package']['acl']['acl-domain-quota'];
         }
 
-        if ( (isset($args['package']['acl']['acl-rslimit-disk']) && $args['package']['acl']['acl-rslimit-disk']) || (isset($args['package']['acl']['acl-rslimit-bw']) && $args['package']['acl']['acl-rslimit-bw'])) {
+        if ((isset($args['package']['acl']['acl-rslimit-disk']) && $args['package']['acl']['acl-rslimit-disk']) || (isset($args['package']['acl']['acl-rslimit-bw']) && $args['package']['acl']['acl-rslimit-bw'])) {
             $tmpArgs['enable_resource_limits'] = 1;
             $tmpArgs['bandwidth_limit'] = $args['package']['acl']['acl-rslimit-bw'];
             $tmpArgs['diskspace_limit'] = $args['package']['acl']['acl-rslimit-disk'];
 
-            if ( (isset($args['package']['acl']['acl-rsolimit-disk']) && $args['package']['acl']['acl-rsolimit-disk'] == 1) || isset($args['package']['acl']['rsolimit-bw']) && $args['package']['acl']['rsolimit-bw']  ) {
+            if ((isset($args['package']['acl']['acl-rsolimit-disk']) && $args['package']['acl']['acl-rsolimit-disk'] == 1) || isset($args['package']['acl']['rsolimit-bw']) && $args['package']['acl']['rsolimit-bw']) {
                 $tmpArgs['enable_overselling'] = 1;
                 $tmpArgs['enable_overselling_bandwidth'] = $args['package']['acl']['acl-rsolimit-bw'];
                 $tmpArgs['enable_overselling_diskspace'] = $args['package']['acl']['acl-rsolimit-disk'];
             }
         }
 
-        if ( count($tmpArgs) > 0 ) {
+        if (count($tmpArgs) > 0) {
             $request = $this->api->call('setresellerlimits', array_merge(array('user' => $args['package']['username']), $tmpArgs));
-            if ( $request->result[0]->status != 1 ) {
+            if ($request->result[0]->status != 1) {
                 $error = $request->result[0]->statusmsg . ' setupresellerlimits';
-                $this->email_error ( 'Setup Reseller Limits', $error, $args );
+                $this->email_error('Setup Reseller Limits', $error, $args);
             }
         }
 
-        if ( isset($error) ) {
+        if (isset($error)) {
             CE_Lib::log(4, "plugin_cpanel::setupreselleracls::error: ".$error);
-            throw new CE_Exception ( $error );
+            throw new CE_Exception($error);
         }
     }
 
@@ -663,13 +679,13 @@ class PluginCpanel extends ServerPlugin
         $args = $this->updateArgs($args);
         $request = $this->api->call('setupreseller', array('user' => $args['package']['username'], 'makeowner' => '1'));
 
-        if ( $request->result[0]->status != 1 ) {
-            $error = $this->email_error ( 'Setup Reseller', $request->result[0]->statusmsg, $args );
+        if ($request->result[0]->status != 1) {
+            $error = $this->email_error('Setup Reseller', $request->result[0]->statusmsg, $args);
         }
 
-        if ( isset($error) ) {
+        if (isset($error)) {
             CE_Lib::log(4, "plugin_cpanel::setupreseller::error: ".$error);
-            throw new CE_Exception ( $error );
+            throw new CE_Exception($error);
         }
     }
 
@@ -678,20 +694,20 @@ class PluginCpanel extends ServerPlugin
         $this->setup($args);
         $request = $this->api->call('unsetupreseller', array('user' => $args['package']['username'], 'makeowner' => 1));
 
-        if ( $request->result[0]->status != 1 ) {
-            $error = $this->email_error ( 'Unsetup Reseller', $request->result[0]->statusmsg, $args );
+        if ($request->result[0]->status != 1) {
+            $error = $this->email_error('Unsetup Reseller', $request->result[0]->statusmsg, $args);
         }
 
-        if ( isset($error) ) {
+        if (isset($error)) {
             CE_Lib::log(4, "plugin_cpanel::unsetupreseller::error: ".$error);
-            throw new CE_Exception ( $error );
+            throw new CE_Exception($error);
         }
     }
 
     private function updateArgs($args)
     {
         $args['package']['username'] = trim(strtolower($args['package']['username']));
-        if ( isset($args['changes']['username']) ) {
+        if (isset($args['changes']['username'])) {
             $args['changes']['username'] = trim(strtolower($args['changes']['username']));
         }
 
@@ -705,7 +721,7 @@ class PluginCpanel extends ServerPlugin
         $args = $this->updateArgs($args);
         $actions = array();
 
-        if ( $args['package']['username'] == '' ) {
+        if ($args['package']['username'] == '') {
             // no username, so just pass create, and return
             $actions[] = 'Create';
             return $actions;
@@ -714,7 +730,7 @@ class PluginCpanel extends ServerPlugin
         try {
             $request = $this->api->call('accountsummary', array('user' => $args['package']['username']));
             $actions[] = 'Delete';
-            if ( $request->acct[0]->suspended == 1 ) {
+            if ($request->acct[0]->suspended == 1) {
                 $actions[] = 'UnSuspend';
             } else {
                 $actions[] = 'Suspend';
@@ -735,7 +751,7 @@ class PluginCpanel extends ServerPlugin
         $params = array();
         $params['user'] = trim($args['package']['username']);
         $params['service'] = 'cpaneld';
-        if ( isset($args['package']['is_reseller']) && $args['package']['is_reseller']== 1 ) {
+        if (isset($args['package']['is_reseller']) && $args['package']['is_reseller']== 1) {
             $params['service'] = 'whostmgrd';
             $linkText = $this->user->lang('Login to WHM');
         }
