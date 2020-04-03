@@ -28,7 +28,7 @@ class CpanelApi
     * @param boolean $ssl Use an SSL connection
     * @param string $type Output type
     */
-    public function __construct ( $host, $username, $hash, $ssl = false, $type = 'json' )
+    public function __construct($host, $username, $hash, $ssl = false, $type = 'json')
     {
         $this->host = $host;
         $this->username = $username;
@@ -46,56 +46,64 @@ class CpanelApi
     * @param array $params
     * @return boolean
     */
-    public function call ( $function, $params = array() )
+    public function call($function, $params = array())
     {
-        if ( !function_exists('curl_init') ) {
+        if (!function_exists('curl_init')) {
             CE_Lib::debug(1, 'cURL is required in order to connect to cPanel');
             throw new CE_Exception('cURL is required in order to connect to cPanel');
         }
 
         $this->url = $url = $this->schema . $this->host .':'. $this->port .'/json-api/' . $function . $this->build($params);
 
-        $ch = curl_init ( $url );
-        curl_setopt ( $ch, CURLOPT_SSL_VERIFYHOST, false );
-        curl_setopt ( $ch, CURLOPT_SSL_VERIFYPEER, false );
-        curl_setopt ( $ch, CURLOPT_RETURNTRANSFER, true );
-        curl_setopt ( $ch, CURLOPT_CONNECTTIMEOUT, 3 );
-        curl_setopt ( $ch, CURLOPT_HEADER, false );
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
+        curl_setopt($ch, CURLOPT_HEADER, false);
 
         $headers = array();
         $headers[0] = "Authorization: WHM {$this->username}:" . preg_replace("'(\r|\n)'", "", $this->hash);
 
-        curl_setopt ( $ch, CURLOPT_HTTPHEADER, $headers );
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
-        $data = curl_exec ( $ch );
+        $data = curl_exec($ch);
 
-        if ( $data === false ) {
+        if ($data === false) {
             $error = "Cpanel API Request (".$function.") / cURL Error: ".curl_error($ch);
             CE_Lib::log(1, $error);
             throw new Exception($error);
         }
 
+        $data = str_replace('“', "'", $data);
+        $data = str_replace('”', "'", $data);
         $result = $this->result = json_decode(utf8_encode($data));
 
         $this->request = array ( 'url' => $this->url, 'function' => $function, 'params' => $params, 'raw' => $data, 'json' => $result);
 
         CE_Lib::log(3, 'cPanel API Request: '.print_r($this->request, true));
 
-        if ( !is_object($result) ) {
+        if (!is_object($result)) {
             // invalid json... check raw for an SSL error
-            if ( strpos($data, 'SSL encryption is required for access to this server') ) {
+            if (strpos($data, 'SSL encryption is required for access to this server')) {
                 CE_Lib::log(1, "Error from cPanel: SSL encryption is required for access to this server.");
-                throw new Exception ('Error from cPanel: SSL encryption is required for access to this server.');
+                throw new Exception('Error from cPanel: SSL encryption is required for access to this server.');
             }
-            throw new Exception("Cpanel call method: Invalid JSON please check your connection");
-        } else if ( isset($result->data->result) && $result->data->result == 0 ) {
-            throw new CE_Exception("Cpanel returned an error.  ".$result->data->reason);
-        } else if ( isset($result->status) && $result->status == 0 ) {
-            throw new CE_Exception("Cpanel returned an error.  ".$result->statusmsg);
-        } else if ( isset($result->result) && (isset($result->result[0])) && $result->result[0]->status == 0 ) {
-            throw new CE_Exception("Cpanel returned an error.  ".$result->result[0]->statusmsg);
+            if (stristr($data, '<html>') == true) {
+                if (stristr($data, 'refresh') == true) {
+                    throw new CE_Exception('SSL is required to connect');
+                }
+            }
+            throw new Exception("cPanel call method: Invalid JSON please check your connection");
+        } elseif (isset($result->data->result) && $result->data->result == 0) {
+            throw new CE_Exception("cPpanel returned an error:  ".$result->data->reason);
+        } elseif (isset($result->status) && $result->status == 0) {
+            throw new CE_Exception("cPanel returned an error:  ".$result->statusmsg);
+        } elseif (isset($result->result) && (isset($result->result[0])) && $result->result[0]->status == 0) {
+            throw new CE_Exception("cPanel returned an error:  ".$result->result[0]->statusmsg);
+        } elseif (isset($result->cpanelresult->error) && $result->cpanelresult->error == 'Access denied') {
+            throw new CE_Exception('Access denied, please double check Username and API Token');
         }
-
         return $result;
     }
 
@@ -104,14 +112,14 @@ class CpanelApi
     * @param array $params Key => Value array of parameters to send as the request.
     * @return string Properly built http query string
     */
-    private function build ( $params = array() )
+    private function build($params = array())
     {
-        if ( count($params) == 0 ) {
+        if (count($params) == 0) {
             return '';
         }
 
         $queryString = array();
-        foreach ( $params as $k => $v ) {
+        foreach ($params as $k => $v) {
              $queryString[] = $k .'='. urlencode($v);
         }
 
@@ -123,12 +131,12 @@ class CpanelApi
     * @link http://docs.cpanel.net/twiki/bin/view/AllDocumentation/AutomationIntegration/ListPackages
     * @return Array of packages (key = package name, index = package array)
     */
-    public function packages ()
+    public function packages()
     {
         $result = $this->call('listpkgs');
         $packages = array();
 
-        foreach ( (array)$result->package as $p ) {
+        foreach ((array)$result->package as $p) {
              $packages[trim($p->name)] = $p;
         }
 
@@ -140,12 +148,12 @@ class CpanelApi
     * @link http://docs.cpanel.net/twiki/bin/view/AllDocumentation/AutomationIntegration/ListAccounts
     * @return Array of accounts (key = account username, index = account array)
     */
-    public function accounts ()
+    public function accounts()
     {
         $result = $this->call('listaccts');
         $accounts = array();
 
-        foreach ( (array)$result->acct as $a ) {
+        foreach ((array)$result->acct as $a) {
              $accounts[$a->user] = $a;
         }
 
@@ -156,13 +164,13 @@ class CpanelApi
     * Gets all the suspended accounts.
     * @link http://docs.cpanel.net/twiki/bin/view/AllDocumentation/AutomationIntegration/ListSuspended
     */
-    public function suspended ()
+    public function suspended()
     {
         $result = $this->call('listsuspended');
 
         $accounts = array();
 
-        foreach ( (array)$result->accts as $a ) {
+        foreach ((array)$result->accts as $a) {
             $accounts[$a->user] = $a;
         }
 
@@ -174,7 +182,7 @@ class CpanelApi
     * @link http://docs.cpanel.net/twiki/bin/view/AllDocumentation/AutomationIntegration/DisplaycPanelWHMVersion
     * @return string Current WHM version
     */
-    public function version ()
+    public function version()
     {
         $result = $this->call('version');
         return $result->version;

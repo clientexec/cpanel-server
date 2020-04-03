@@ -152,6 +152,12 @@ class PluginCpanel extends ServerPlugin
                         'description'    => lang('Enable SPF on this account.'),
                         'value'          => '0',
                     ),
+                    'owner' => array(
+                        'type'           => 'check',
+                        'label'          =>'Make the reseller account own itself',
+                        'description'    => lang('Make the reseller account own itself.'),
+                        'value'          => '1',
+                    ),
                 )
             )
         );
@@ -375,13 +381,6 @@ class PluginCpanel extends ServerPlugin
             $args['package']['acl']['acl-ssl'] = 1;
         }
 
-        // Checks if the plan exists.
-        if (!$this->CheckCpanelPlan($args['package']['name_on_server'], $args)) {
-            $error = "The package '{$args['package']['name_on_server']}' is not available in WHM.  Make sure you can use this package in WHM, or that the resources are not set to unlimited if your host has this disabled.";
-            $errors[] = $this->email_error('Creation', $error, $args);
-            throw new CE_Exception($error);
-        }
-
         $params = array();
         $params['username'] = $args['package']['username'];
         $params['domain'] = $args['package']['domain_name'];
@@ -521,11 +520,7 @@ class PluginCpanel extends ServerPlugin
         $args = $this->updateArgs($args);
 
         if (isset($args['package']['is_reseller'])) {
-            $request = $this->api->call('terminatereseller', [
-                'user' => $args['package']['username'],
-                'terminatereseller' => 1,
-                'verify' => 'I understand this will irrevocably remove all the accounts owned by the reseller '
-            ]);
+            $request = $this->xmlapi->terminatereseller($args['package']['username']);
         } else {
             $request = $this->api->call('removeacct', ['user' => $args['package']['username']]);
         }
@@ -592,8 +587,13 @@ class PluginCpanel extends ServerPlugin
     {
         CE_Lib::log(4, 'Testing connection to cPanel server');
         $this->setup($args);
-        $response = $this->api->packages();
-        if (count($response) == 0) {
+        try {
+            $response = $this->api->packages();
+        } catch (Exception $e) {
+            throw new CE_Exception($e->getMessage());
+        }
+
+        if (!is_array($response)) {
             throw new CE_Exception("Connection to server failed.");
         }
     }
@@ -677,7 +677,13 @@ class PluginCpanel extends ServerPlugin
     {
         $this->setup($args);
         $args = $this->updateArgs($args);
-        $request = $this->api->call('setupreseller', array('user' => $args['package']['username'], 'makeowner' => '1'));
+
+        $makeOwner = 0;
+        if (isset($args['package']['variables']['owner']) && $args['package']['variables']['owner'] == 1) {
+            $makeOwner = 1;
+        }
+
+        $request = $this->api->call('setupreseller', array('user' => $args['package']['username'], 'makeowner' => $makeOwner));
 
         if ($request->result[0]->status != 1) {
             $error = $this->email_error('Setup Reseller', $request->result[0]->statusmsg, $args);
@@ -741,23 +747,31 @@ class PluginCpanel extends ServerPlugin
         return $actions;
     }
 
-    function getDirectLink($userPackage, $getRealLink = true)
+    function getDirectLink($userPackage, $getRealLink = true, $fromAdmin = false, $isReseller = false)
     {
-        $linkText = $this->user->lang('Login to cPanel');
-
         $args = $this->buildParams($userPackage);
         $this->setup($args);
-
-        $params = array();
+        $params = [];
         $params['user'] = trim($args['package']['username']);
         $params['service'] = 'cpaneld';
-        if (isset($args['package']['is_reseller']) && $args['package']['is_reseller']== 1) {
+        $params['api.version'] = '1';
+
+        $linkText = $this->user->lang('Login to cPanel');
+        if ($isReseller && isset($args['package']['is_reseller']) && $args['package']['is_reseller'] == 1) {
             $params['service'] = 'whostmgrd';
             $linkText = $this->user->lang('Login to WHM');
         }
-        $params['api.version'] = '1';
 
-        if ($getRealLink) {
+        if ($fromAdmin) {
+            $cmd = 'panellogin';
+            if ($isReseller && isset($args['package']['is_reseller']) && $args['package']['is_reseller'] == 1) {
+                $cmd = 'panellogin_reseller';
+            }
+            return [
+                'cmd' => $cmd,
+                'label' => $linkText
+            ];
+        } elseif ($getRealLink) {
             $result = $this->api->call('create_user_session', $params);
 
             return array(
@@ -766,10 +780,30 @@ class PluginCpanel extends ServerPlugin
                 'form'    => ''
             );
         } else {
+            $link = 'index.php?fuse=clients&controller=products&action=openpackagedirectlink&packageId='.$userPackage->getId().'&sessionHash='.CE_Lib::getSessionHash();
+
+            if ($isReseller && isset($args['package']['is_reseller']) && $args['package']['is_reseller'] == 1) {
+                $link .= '&isReseller=1';
+            }
+
             return array(
-                'link' => '<li><a target="_blank" href="index.php?fuse=clients&controller=products&action=openpackagedirectlink&packageId='.$userPackage->getId().'&sessionHash='.CE_Lib::getSessionHash().'">' .$linkText . '</a></li>',
+                'link' => '<li><a target="_blank" href="' . $link .  '">' .$linkText . '</a></li>',
                 'form' => ''
             );
         }
+    }
+
+    function dopanellogin($args)
+    {
+        $userPackage = new UserPackage($args['userPackageId']);
+        $response = $this->getDirectLink($userPackage);
+        return $response['rawlink'];
+    }
+
+    function dopanellogin_reseller($args)
+    {
+        $userPackage = new UserPackage($args['userPackageId']);
+        $response = $this->getDirectLink($userPackage, true, false, true);
+        return $response['rawlink'];
     }
 }
