@@ -70,7 +70,16 @@ class CpanelApi
         $data = curl_exec($ch);
 
         if ($data === false) {
-            $error = "Cpanel API Request (".$function.") / cURL Error: ".curl_error($ch);
+            $errorDesc = curl_error($ch);
+            if ($errorDesc != '') {
+                $error = "cPanel API Request (".$function.") / cURL Error: ". $errorDesc;
+            } else {
+                $errorNumber = curl_errno($ch);
+                if ($errorNumber == 3) {
+                    $error = "cPanel API Request (".$function.") / cURL Error: Server Hostname is not valid.";
+                }
+            }
+
             CE_Lib::log(1, $error);
             throw new Exception($error);
         }

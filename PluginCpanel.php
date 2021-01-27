@@ -18,7 +18,8 @@ class PluginCpanel extends ServerPlugin
         'packageName' => true,
         'testConnection' => true,
         'showNameservers' => true,
-        'directlink' => true
+        'directlink' => true,
+        'upgrades' => true
     );
 
     public $api;
@@ -385,7 +386,7 @@ class PluginCpanel extends ServerPlugin
         $params['username'] = $args['package']['username'];
         $params['domain'] = $args['package']['domain_name'];
         $params['plan'] = $args['package']['name_on_server'];
-        $params['password'] = urlencode($args['package']['password']);
+        $params['password'] = $args['package']['password'];
         $params['contactemail'] = $args['customer']['email'];
         $params['dkim'] = 0;
         if (isset($args['package']['variables']['dkim']) && $args['package']['variables']['dkim'] == 1) {
@@ -474,13 +475,7 @@ class PluginCpanel extends ServerPlugin
                     break;
 
                 case 'package':
-                    if (!$this->CheckCpanelPlan($args['package']['name_on_server'], $args)) {
-                        $error = "The package '{$args['package']['name_on_server']}' was not found on the server.";
-                        $errors[] = $this->email_error('Creation', $error, $args);
-                        throw new CE_Exception($error);
-                    }
-
-                    $request = $this->api->call('changepackage', array('user' => $args['package']['username'], 'pkg' => urlencode($args['package']['name_on_server'])));
+                    $request = $this->api->call('changepackage', array('user' => $args['package']['username'], 'pkg' => $args['package']['name_on_server']));
                     if ($request->result[0]->status != 1) {
                         $errors[] = $this->email_error('Plan Change', $request->result[0]->statusmsg, $args);
                     } else {
