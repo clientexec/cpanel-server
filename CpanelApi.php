@@ -142,10 +142,10 @@ class CpanelApi
     */
     public function packages()
     {
-        $result = $this->call('listpkgs');
-        $packages = array();
+        $result = $this->call('matchpkgs', ['api.version' => 1]);
+        $packages = [];
 
-        foreach ((array)$result->package as $p) {
+        foreach ((array)$result->data->pkg as $p) {
              $packages[trim($p->name)] = $p;
         }
 

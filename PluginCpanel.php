@@ -1003,14 +1003,14 @@ class PluginCpanel extends ServerPlugin
     {
         $userPackage = new UserPackage($args['userPackageId']);
         $response = $this->getDirectLink($userPackage);
-        return $response['rawlink'];
+        return $response['link'];
     }
 
     public function dopanellogin_reseller($args)
     {
         $userPackage = new UserPackage($args['userPackageId']);
         $response = $this->getDirectLink($userPackage, true, false, true);
-        return $response['rawlink'];
+        return $response['link'];
     }
 
     public function getAdminDirectLink($args)
