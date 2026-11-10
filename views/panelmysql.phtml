@@ -1,0 +1,312 @@
+<?php if ($this->loadError != '') { ?>
+    <div class="alert alert-danger"><?php echo $this->loadError; ?></div>
+<?php } else { ?>
+    <?php
+    $prefix = $this->mysql['prefix'];
+    $databaseMaxLength = max(1, $this->mysql['maxDatabaseLength'] - mb_strlen($prefix));
+    $userMaxLength = max(1, $this->mysql['maxUsernameLength'] - mb_strlen($prefix));
+    ?>
+    <div class="mb-2">
+        <button type="button" class="btn btn-success mr-1 mb-1" data-toggle="modal" data-target="#cpanel-mysql-db-create-modal">
+            <?php echo $this->user->lang('Create Database'); ?>
+        </button>
+        <button type="button" class="btn btn-success mr-1 mb-1" data-toggle="modal" data-target="#cpanel-mysql-user-create-modal">
+            <?php echo $this->user->lang('Create User'); ?>
+        </button>
+        <button type="button" class="btn btn-primary mb-1" data-toggle="modal" data-target="#cpanel-mysql-grant-modal">
+            <?php echo $this->user->lang('Add User to Database'); ?>
+        </button>
+    </div>
+
+    <h5 class="mt-3"><?php echo $this->user->lang('Databases'); ?></h5>
+    <div class="data-table-wrapper">
+        <div class="table-responsive">
+            <table class="table" id="cpanel-mysql-db-list">
+                <thead>
+                <tr>
+                    <th><?php echo $this->user->lang('Database'); ?></th>
+                    <th><?php echo $this->user->lang('Size'); ?></th>
+                    <th><?php echo $this->user->lang('Users'); ?></th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                <?php foreach ($this->databases as $database) { ?>
+                    <tr>
+                        <td><?php echo $this->escape($database['name']); ?></td>
+                        <td><?php echo $this->escape($database['size']); ?></td>
+                        <td>
+                            <?php foreach ($database['users'] as $dbUser) { ?>
+                                <span class="badge badge-light mr-1 mb-1">
+                            <?php echo $this->escape($dbUser); ?>
+                            <button type="button" class="btn btn-link btn-sm p-0 ml-1 text-danger cpanel-mysql-revoke"
+                                    data-database="<?php echo $this->escape($database['name']); ?>"
+                                    data-user="<?php echo $this->escape($dbUser); ?>"
+                                    title="<?php echo $this->user->lang('Remove user from database'); ?>">&times;</button>
+                        </span>
+                            <?php } ?>
+                        </td>
+                        <td class="text-right text-nowrap">
+                            <button type="button" class="btn btn-sm btn-danger cpanel-mysql-db-delete" data-database="<?php echo $this->escape($database['name']); ?>">
+                                <?php echo $this->user->lang('Delete'); ?>
+                            </button>
+                        </td>
+                    </tr>
+                <?php } ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <h5 class="mt-4"><?php echo $this->user->lang('Database Users'); ?></h5>
+    <div class="data-table-wrapper">
+        <div class="table-responsive">
+            <table class="table" id="cpanel-mysql-user-list">
+                <thead>
+                <tr>
+                    <th><?php echo $this->user->lang('User'); ?></th>
+                    <th><?php echo $this->user->lang('Databases'); ?></th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                <?php foreach ($this->dbUsers as $dbUser) { ?>
+                    <tr>
+                        <td><?php echo $this->escape($dbUser['name']); ?></td>
+                        <td><?php echo $this->escape(implode(', ', $dbUser['databases'])); ?></td>
+                        <td class="text-right text-nowrap">
+                            <button type="button" class="btn btn-sm btn-secondary cpanel-mysql-user-password" data-user="<?php echo $this->escape($dbUser['name']); ?>">
+                                <?php echo $this->user->lang('Change Password'); ?>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-danger cpanel-mysql-user-delete" data-user="<?php echo $this->escape($dbUser['name']); ?>">
+                                <?php echo $this->user->lang('Delete'); ?>
+                            </button>
+                        </td>
+                    </tr>
+                <?php } ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="modal" tabindex="-1" role="dialog" id="cpanel-mysql-db-create-modal">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><?php echo $this->user->lang('Create Database'); ?></h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="<?php echo $this->user->lang('Close'); ?>">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="cpanel-mysql-db-name"><?php echo $this->user->lang('Database Name'); ?></label>
+                        <div class="input-group">
+                            <?php if ($prefix !== '') { ?>
+                                <div class="input-group-prepend"><span class="input-group-text"><?php echo $this->escape($prefix); ?></span></div>
+                            <?php } ?>
+                            <input type="text" id="cpanel-mysql-db-name" class="form-control" maxlength="<?php echo (int) $databaseMaxLength; ?>" autocomplete="off" />
+                        </div>
+                        <small class="form-text text-muted"><?php echo $this->user->lang('Letters, numbers and underscores only'); ?></small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" id="cpanel-mysql-db-create-submit"><?php echo $this->user->lang('Create'); ?></button>
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal"><?php echo $this->user->lang('Close'); ?></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" tabindex="-1" role="dialog" id="cpanel-mysql-user-create-modal">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><?php echo $this->user->lang('Create User'); ?></h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="<?php echo $this->user->lang('Close'); ?>">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="cpanel-mysql-user-name"><?php echo $this->user->lang('Username'); ?></label>
+                        <div class="input-group">
+                            <?php if ($prefix !== '') { ?>
+                                <div class="input-group-prepend"><span class="input-group-text"><?php echo $this->escape($prefix); ?></span></div>
+                            <?php } ?>
+                            <input type="text" id="cpanel-mysql-user-name" class="form-control" maxlength="<?php echo (int) $userMaxLength; ?>" autocomplete="off" />
+                        </div>
+                        <small class="form-text text-muted"><?php echo $this->user->lang('Letters, numbers and underscores only'); ?></small>
+                    </div>
+                    <div class="form-group">
+                        <label for="cpanel-mysql-user-password"><?php echo $this->user->lang('Password'); ?></label>
+                        <input type="password" id="cpanel-mysql-user-password" class="form-control" autocomplete="new-password" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" id="cpanel-mysql-user-create-submit"><?php echo $this->user->lang('Create'); ?></button>
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal"><?php echo $this->user->lang('Close'); ?></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" tabindex="-1" role="dialog" id="cpanel-mysql-grant-modal">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><?php echo $this->user->lang('Add User to Database'); ?></h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="<?php echo $this->user->lang('Close'); ?>">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <?php if (count($this->databases) == 0 || count($this->dbUsers) == 0) { ?>
+                        <p class="mb-0"><?php echo $this->user->lang('Create at least one database and one user first.'); ?></p>
+                    <?php } else { ?>
+                        <div class="form-group">
+                            <label for="cpanel-mysql-grant-user"><?php echo $this->user->lang('User'); ?></label>
+                            <select id="cpanel-mysql-grant-user" class="form-control">
+                                <?php foreach ($this->dbUsers as $dbUser) { ?>
+                                    <option value="<?php echo $this->escape($dbUser['name']); ?>"><?php echo $this->escape($dbUser['name']); ?></option>
+                                <?php } ?>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="cpanel-mysql-grant-database"><?php echo $this->user->lang('Database'); ?></label>
+                            <select id="cpanel-mysql-grant-database" class="form-control">
+                                <?php foreach ($this->databases as $database) { ?>
+                                    <option value="<?php echo $this->escape($database['name']); ?>"><?php echo $this->escape($database['name']); ?></option>
+                                <?php } ?>
+                            </select>
+                        </div>
+                        <small class="form-text text-muted"><?php echo $this->user->lang('The user will be given all privileges on the database.'); ?></small>
+                    <?php } ?>
+                </div>
+                <div class="modal-footer">
+                    <?php if (count($this->databases) > 0 && count($this->dbUsers) > 0) { ?>
+                        <button type="button" class="btn btn-primary" id="cpanel-mysql-grant-submit"><?php echo $this->user->lang('Add'); ?></button>
+                    <?php } ?>
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal"><?php echo $this->user->lang('Close'); ?></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" tabindex="-1" role="dialog" id="cpanel-mysql-password-modal">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="cpanel-mysql-password-title"></h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="<?php echo $this->user->lang('Close'); ?>">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="cpanel-mysql-password-user" />
+                    <div class="form-group">
+                        <label for="cpanel-mysql-password-value"><?php echo $this->user->lang('New Password'); ?></label>
+                        <input type="password" id="cpanel-mysql-password-value" class="form-control" autocomplete="new-password" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" id="cpanel-mysql-password-submit"><?php echo $this->user->lang('Save'); ?></button>
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal"><?php echo $this->user->lang('Close'); ?></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="plugins/server/cpanel/assets/panels.js?v=<?php echo (int) filemtime(__DIR__ . '/../assets/panels.js'); ?>"></script>
+    <script>
+        (function () {
+            var panel = CpanelPanel.create(<?php echo (int) $this->userPackageId; ?>, 'panelMysql');
+
+            $(document).ready(function () {
+                panel.table('#cpanel-mysql-db-list', clientexec.lang('No databases to show'), clientexec.lang('No matching databases found'));
+                panel.table('#cpanel-mysql-user-list', clientexec.lang('No database users to show'), clientexec.lang('No matching database users found'));
+            });
+
+            // Delegated handlers so buttons keep working across DataTables paging and filtering
+            $('#cpanel-mysql-db-list').on('click', '.cpanel-mysql-db-delete', function () {
+                panel.confirmAction(
+                    clientexec.lang('Delete Database'),
+                    clientexec.lang('Are you sure you want to delete this database? All of its data will be permanently removed.'),
+                    clientexec.lang('Delete'),
+                    'deleteDatabase',
+                    { database: $(this).data('database') }
+                );
+            });
+
+            $('#cpanel-mysql-db-list').on('click', '.cpanel-mysql-revoke', function () {
+                panel.confirmAction(
+                    clientexec.lang('Remove User from Database'),
+                    clientexec.lang('Are you sure you want to remove database access for this user?'),
+                    clientexec.lang('Remove'),
+                    'revokeDbAccess',
+                    { database: $(this).data('database'), user: $(this).data('user') }
+                );
+            });
+
+            $('#cpanel-mysql-user-list').on('click', '.cpanel-mysql-user-delete', function () {
+                panel.confirmAction(
+                    clientexec.lang('Delete Database User'),
+                    clientexec.lang('Are you sure you want to delete this database user? Anything using it to connect will stop working.'),
+                    clientexec.lang('Delete'),
+                    'deleteDbUser',
+                    { user: $(this).data('user') }
+                );
+            });
+
+            $('#cpanel-mysql-user-list').on('click', '.cpanel-mysql-user-password', function () {
+                var user = $(this).data('user');
+                $('#cpanel-mysql-password-title').text(user);
+                $('#cpanel-mysql-password-user').val(user);
+                $('#cpanel-mysql-password-value').val('');
+                $('#cpanel-mysql-password-modal').modal('show');
+            });
+
+            $('#cpanel-mysql-db-create-submit').on('click', function () {
+                var name = $.trim($('#cpanel-mysql-db-name').val());
+                if (name === '') {
+                    return;
+                }
+                $('#cpanel-mysql-db-create-modal').modal('hide');
+                panel.reloadAction('createDatabase', { name: name });
+            });
+
+            $('#cpanel-mysql-user-create-submit').on('click', function () {
+                var data = {
+                    name: $.trim($('#cpanel-mysql-user-name').val()),
+                    password: $('#cpanel-mysql-user-password').val()
+                };
+                if (data.name === '' || data.password === '') {
+                    return;
+                }
+                $('#cpanel-mysql-user-create-modal').modal('hide');
+                panel.reloadAction('createDbUser', data);
+            });
+
+            $('#cpanel-mysql-grant-submit').on('click', function () {
+                var data = {
+                    user: $('#cpanel-mysql-grant-user').val(),
+                    database: $('#cpanel-mysql-grant-database').val()
+                };
+                $('#cpanel-mysql-grant-modal').modal('hide');
+                panel.reloadAction('grantDbAccess', data);
+            });
+
+            $('#cpanel-mysql-password-submit').on('click', function () {
+                var data = {
+                    user: $('#cpanel-mysql-password-user').val(),
+                    password: $('#cpanel-mysql-password-value').val()
+                };
+                if (data.password === '') {
+                    return;
+                }
+                $('#cpanel-mysql-password-modal').modal('hide');
+                panel.reloadAction('updateDbUserPassword', data);
+            });
+        })();
+    </script>
+<?php } ?>

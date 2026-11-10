@@ -733,31 +733,37 @@ class xmlapi
         return $response;
     }
 
-    private function curl_query( $url, $postdata, $authstr )
+    private function curl_query($url, $postdata, $authstr): string
     {
         $curl = curl_init();
-        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, 0);
         // Return contents of transfer on curl_exec
-         curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
-        // Allow self-signed certs
-        curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, 0);
+        curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
+
+        // Verify the server certificate against Composer's CA bundle
+        $caPathOrFile = \Composer\CaBundle\CaBundle::getSystemCaRootBundlePath();
+        if (is_dir($caPathOrFile)) {
+            curl_setopt($curl, CURLOPT_CAPATH, $caPathOrFile);
+        } else {
+            curl_setopt($curl, CURLOPT_CAINFO, $caPathOrFile);
+        }
+
         // Set the URL
         curl_setopt($curl, CURLOPT_URL, $url);
         // Increase buffer size to avoid "funny output" exception
         curl_setopt($curl, CURLOPT_BUFFERSIZE, 131072);
 
         // Pass authentication header
-        $header[0] =$authstr .
+        $header[0] = $authstr .
             "Content-Type: application/x-www-form-urlencoded\r\n" .
             "Content-Length: " . strlen($postdata) . "\r\n" . "\r\n" . $postdata;
 
         curl_setopt($curl, CURLOPT_HTTPHEADER, $header);
-
         curl_setopt($curl, CURLOPT_POST, 1);
 
         $result = curl_exec($curl);
         if ($result == false) {
-            throw new Exception("curl_exec threw error \"" . curl_error($curl) . "\" for " . $url . "?" . $postdata );
+            // The post data is left out of the message since it can contain account passwords
+            throw new Exception("curl_exec threw error \"" . curl_error($curl) . "\" for " . $url);
         }
         curl_close($curl);
 

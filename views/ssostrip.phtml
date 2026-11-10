@@ -1,0 +1,30 @@
+<div class="row">
+    <div class="col-12">
+        <div class="white-card" id="cpanel-sso-strip">
+            <h6><?php echo $this->user->lang('Quick Login'); ?></h6>
+            <ul>
+                <li>
+                    <div class="d-flex flex-wrap">
+                        <?php foreach ($this->ssoTargets as $key => $target) { ?>
+                            <button type="button" class="btn btn-outline-primary mr-2 mb-2 cpanel-sso-button" data-target-key="<?php echo $this->escape($key); ?>">
+                                <i class="<?php echo $this->escape($target['icon']); ?>"></i>
+                                <?php echo $this->escape($target['label']); ?>
+                            </button>
+                        <?php } ?>
+                    </div>
+                </li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<script src="plugins/server/cpanel/assets/panels.js?v=<?php echo (int) filemtime(__DIR__ . '/../assets/panels.js'); ?>"></script>
+<script>
+    (function () {
+        var panel = CpanelPanel.create(<?php echo (int) $this->userPackageId; ?>, 'publicView');
+
+        $('#cpanel-sso-strip').on('click', '.cpanel-sso-button', function () {
+            panel.openUrlAction('ssoLogin', { target: $(this).data('target-key') });
+        });
+    })();
+</script>

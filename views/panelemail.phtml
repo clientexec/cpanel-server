@@ -1,0 +1,172 @@
+<?php if ($this->loadError != '') { ?>
+    <div class="alert alert-danger"><?php echo $this->loadError; ?></div>
+<?php } else { ?>
+    <button type="button" class="btn btn-success mb-2" data-toggle="modal" data-target="#cpanel-email-create-modal">
+        <?php echo $this->user->lang('Create Email Account'); ?>
+    </button>
+    <div class="data-table-wrapper">
+        <div class="table-responsive">
+            <table class="table" id="cpanel-email-list">
+                <thead>
+                <tr>
+                    <th><?php echo $this->user->lang('Email Address'); ?></th>
+                    <th><?php echo $this->user->lang('Disk Used'); ?></th>
+                    <th><?php echo $this->user->lang('Quota'); ?></th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                <?php foreach ($this->emails as $mailbox) { ?>
+                    <tr>
+                        <td><?php echo $this->escape($mailbox['email']); ?></td>
+                        <td><?php echo $this->escape($mailbox['used']); ?></td>
+                        <td><?php echo $this->escape($mailbox['quota']); ?></td>
+                        <td class="text-right text-nowrap">
+                            <button type="button" class="btn btn-sm btn-primary cpanel-email-login" data-email="<?php echo $this->escape($mailbox['email']); ?>">
+                                <?php echo $this->user->lang('Webmail'); ?>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-secondary cpanel-email-edit" data-email="<?php echo $this->escape($mailbox['email']); ?>">
+                                <?php echo $this->user->lang('Edit'); ?>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-danger cpanel-email-delete" data-email="<?php echo $this->escape($mailbox['email']); ?>">
+                                <?php echo $this->user->lang('Delete'); ?>
+                            </button>
+                        </td>
+                    </tr>
+                <?php } ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="modal" tabindex="-1" role="dialog" id="cpanel-email-create-modal">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><?php echo $this->user->lang('Create Email Account'); ?></h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="<?php echo $this->user->lang('Close'); ?>">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="cpanel-email-user"><?php echo $this->user->lang('Email Address'); ?></label>
+                        <div class="input-group">
+                            <input type="text" id="cpanel-email-user" class="form-control" autocomplete="off" />
+                            <div class="input-group-append"><span class="input-group-text">@</span></div>
+                            <select id="cpanel-email-domain" class="form-control">
+                                <?php foreach ($this->domains as $domain) { ?>
+                                    <option value="<?php echo $this->escape($domain); ?>"><?php echo $this->escape($domain); ?></option>
+                                <?php } ?>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="cpanel-email-password"><?php echo $this->user->lang('Password'); ?></label>
+                        <input type="password" id="cpanel-email-password" class="form-control" autocomplete="new-password" />
+                    </div>
+                    <div class="form-group">
+                        <label for="cpanel-email-quota"><?php echo $this->user->lang('Quota (MB)'); ?></label>
+                        <input type="number" min="0" id="cpanel-email-quota" class="form-control" value="0" />
+                        <small class="form-text text-muted"><?php echo $this->user->lang('Enter 0 for unlimited'); ?></small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" id="cpanel-email-create-submit"><?php echo $this->user->lang('Create'); ?></button>
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal"><?php echo $this->user->lang('Close'); ?></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" tabindex="-1" role="dialog" id="cpanel-email-edit-modal">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="cpanel-email-edit-title"></h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="<?php echo $this->user->lang('Close'); ?>">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="cpanel-email-edit-address" />
+                    <div class="form-group">
+                        <label for="cpanel-email-edit-password"><?php echo $this->user->lang('New Password'); ?></label>
+                        <input type="password" id="cpanel-email-edit-password" class="form-control" autocomplete="new-password" />
+                    </div>
+                    <div class="form-group">
+                        <label for="cpanel-email-edit-quota"><?php echo $this->user->lang('New Quota (MB)'); ?></label>
+                        <input type="number" min="0" id="cpanel-email-edit-quota" class="form-control" />
+                        <small class="form-text text-muted"><?php echo $this->user->lang('Leave a field blank to keep its current value. Enter 0 for an unlimited quota.'); ?></small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" id="cpanel-email-edit-submit"><?php echo $this->user->lang('Save'); ?></button>
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal"><?php echo $this->user->lang('Close'); ?></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="plugins/server/cpanel/assets/panels.js?v=<?php echo (int) filemtime(__DIR__ . '/../assets/panels.js'); ?>"></script>
+    <script>
+        (function () {
+            var panel = CpanelPanel.create(<?php echo (int) $this->userPackageId; ?>, 'panelEmail');
+
+            $(document).ready(function () {
+                panel.table('#cpanel-email-list', clientexec.lang('No email accounts to show'), clientexec.lang('No matching email accounts found'));
+            });
+
+            // Delegated handlers so buttons keep working across DataTables paging and filtering
+            $('#cpanel-email-list').on('click', '.cpanel-email-login', function () {
+                panel.openUrlAction('emailLogin', { email: $(this).data('email') });
+            });
+
+            $('#cpanel-email-list').on('click', '.cpanel-email-edit', function () {
+                var email = $(this).data('email');
+                $('#cpanel-email-edit-title').text(email);
+                $('#cpanel-email-edit-address').val(email);
+                $('#cpanel-email-edit-password').val('');
+                $('#cpanel-email-edit-quota').val('');
+                $('#cpanel-email-edit-modal').modal('show');
+            });
+
+            $('#cpanel-email-list').on('click', '.cpanel-email-delete', function () {
+                panel.confirmAction(
+                    clientexec.lang('Delete Email Account'),
+                    clientexec.lang('Are you sure you want to delete this email account? All of its mail will be permanently removed.'),
+                    clientexec.lang('Delete'),
+                    'deleteEmail',
+                    { email: $(this).data('email') }
+                );
+            });
+
+            $('#cpanel-email-create-submit').on('click', function () {
+                var data = {
+                    user: $.trim($('#cpanel-email-user').val()),
+                    domain: $('#cpanel-email-domain').val(),
+                    password: $('#cpanel-email-password').val(),
+                    quota: $.trim($('#cpanel-email-quota').val())
+                };
+                if (data.user === '' || data.password === '') {
+                    return;
+                }
+                $('#cpanel-email-create-modal').modal('hide');
+                panel.reloadAction('createEmail', data);
+            });
+
+            $('#cpanel-email-edit-submit').on('click', function () {
+                var data = {
+                    email: $('#cpanel-email-edit-address').val(),
+                    password: $('#cpanel-email-edit-password').val(),
+                    quota: $.trim($('#cpanel-email-edit-quota').val())
+                };
+                if (data.password === '' && data.quota === '') {
+                    return;
+                }
+                $('#cpanel-email-edit-modal').modal('hide');
+                panel.reloadAction('updateEmail', data);
+            });
+        })();
+    </script>
+<?php } ?>

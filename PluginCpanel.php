@@ -7,14 +7,14 @@ require_once dirname(__FILE__) . '/xmlapl.php';
 
 class PluginCpanel extends ServerPlugin
 {
-    public $features = array(
+    public $features = [
         'packageName' => true,
         'testConnection' => true,
         'showNameservers' => true,
         'directlink' => true,
         'admindirectlink' => true,
-        'upgrades' => true
-    );
+        'upgrades' => true,
+    ];
 
     public $api;
     public $xmlapi;
@@ -391,7 +391,7 @@ class PluginCpanel extends ServerPlugin
 
     /**
      * Sets up the CpanelApi object in order to make requests to the server.
-     * @param <type> $args Standard set of arguments in order to make API request.
+     * @param array $args Standard set of arguments in order to make API request.
      */
     public function setup($args)
     {
@@ -413,7 +413,7 @@ class PluginCpanel extends ServerPlugin
     /**
      * Emails cPanel server errors.
      * @param String $name
-     * @param String $message
+     * @param mixed $message
      * @param Array $args
      * @return string
      */
@@ -460,24 +460,30 @@ class PluginCpanel extends ServerPlugin
     }
 
     /**
-     * Show views that might be specific to this plugin.
-     * This content should be echoed out not returned
+     * Renders the single sign-on buttons shown on the client's main package page.
      *
-     * @param UserPackage $user_package
-     * @param CE_Controller_Action $action
-     * @return html
+     * @param UserPackage $userPackage
+     * @param CE_View $view
+     *
+     * @return string
      */
-    public function show_publicviews($user_package, $action)
+    public function getPublicView(UserPackage $userPackage, $view): string
     {
-        $action->view->addScriptPath(APPLICATION_PATH . '/../plugins/server/cpanel/');
-        $product_id = $action->getParam('id', FILTER_SANITIZE_NUMBER_INT);
+        // productAction() calls this for every hosting package, so inactive ones get nothing
+        if (!$userPackage->isActive()) {
+            return '';
+        }
 
-        echo $action->view->render('cpanel.phtml');
+        $view->addScriptPath(__DIR__ . '/views/');
+        $view->userPackageId = $userPackage->getId();
+        $view->ssoTargets = $this->getSsoTargets();
+
+        return $view->render('ssostrip.phtml');
     }
 
     /**
      * Preps for account creation or update.
-     * @param <type> $args
+     * @param array $args
      */
     public function validateCredentials($args)
     {
@@ -522,7 +528,7 @@ class PluginCpanel extends ServerPlugin
             $errors[] = 'Domain username can\'t contain underscores';
         }
 
-         // Username cannot contain a period (.)
+        // Username cannot contain a period (.)
         if (strpos($args['package']['username'], ".") !== false) {
             $args['package']['username'] = str_replace(".", "", $args['package']['username']);
             $errors[] = 'Domain username can\'t contain periods';
@@ -1032,5 +1038,1158 @@ class PluginCpanel extends ServerPlugin
             return $result->data->url;
         }
         return false;
+    }
+
+    /**
+     * Renders the Email Accounts public panel.
+     *
+     * @param UserPackage $userPackage Package the panel is shown for (ownership verified by the controller)
+     * @param CE_View $view
+     *
+     * @return string
+     */
+    public function panelEmail(UserPackage $userPackage, $view): string
+    {
+        $view->addScriptPath(__DIR__ . '/views/');
+        $view->userPackageId = $userPackage->getId();
+        $view->emails = [];
+        $view->domains = [];
+        $view->loadError = '';
+
+        try {
+            $username = $this->setupPanel($userPackage);
+            $view->emails = $this->getMailboxes($username);
+            $view->domains = $this->getAccountDomains($username);
+        } catch (Exception $e) {
+            CE_Lib::log(1, 'cPanel email panel failed to load for package ' . $userPackage->getId() . ': ' . $e->getMessage());
+            $view->loadError = $this->user->lang('Unable to load email accounts. Please try again later.');
+        }
+
+        return $view->render('panelemail.phtml');
+    }
+
+    /**
+     * Creates a mailbox on one of the account's domains.
+     *
+     * @param UserPackage $userPackage
+     * @param array $request
+     *
+     * @return array
+     */
+    public function createEmail(UserPackage $userPackage, array $request): array
+    {
+        $username = $this->setupPanel($userPackage);
+
+        $localPart = mb_strtolower(trim((string) ($request['user'] ?? '')));
+        $domain = mb_strtolower(trim((string) ($request['domain'] ?? '')));
+        $password = (string) ($request['password'] ?? '');
+        $quota = trim((string) ($request['quota'] ?? '0'));
+
+        if (preg_match('/^[a-z0-9._+-]{1,64}$/', $localPart) !== 1) {
+            throw new CE_Exception($this->user->lang('Please enter a valid email address'));
+        }
+
+        if (!in_array($domain, $this->getAccountDomains($username), true)) {
+            throw new CE_Exception($this->user->lang('Please select a valid domain'));
+        }
+
+        if ($password === '') {
+            throw new CE_Exception($this->user->lang('Please enter a password'));
+        }
+
+        if ($quota === '' || !ctype_digit($quota)) {
+            throw new CE_Exception($this->user->lang('Please enter a valid quota'));
+        }
+
+        $this->api->uapi($username, 'Email', 'add_pop', [
+            'email' => $localPart,
+            'domain' => $domain,
+            'password' => $password,
+            'quota' => (int) $quota,
+        ]);
+
+        return ['message' => $this->user->lang('Email account created')];
+    }
+
+    /**
+     * Deletes one of the account's mailboxes.
+     *
+     * @param UserPackage $userPackage
+     * @param array $request
+     *
+     * @return array
+     */
+    public function deleteEmail(UserPackage $userPackage, array $request): array
+    {
+        $username = $this->setupPanel($userPackage);
+        $email = mb_strtolower(trim((string) ($request['email'] ?? '')));
+
+        $this->assertOwnsMailbox($username, $email);
+        [$localPart, $domain] = $this->splitEmail($email);
+
+        $this->api->uapi($username, 'Email', 'delete_pop', [
+            'email' => $localPart,
+            'domain' => $domain,
+        ]);
+
+        return ['message' => $this->user->lang('Email account deleted')];
+    }
+
+    /**
+     * Changes the password and/or quota of one of the account's mailboxes.
+     * Blank fields are left unchanged.
+     *
+     * @param UserPackage $userPackage
+     * @param array $request
+     *
+     * @return array
+     */
+    public function updateEmail(UserPackage $userPackage, array $request): array
+    {
+        $username = $this->setupPanel($userPackage);
+
+        $email = mb_strtolower(trim((string) ($request['email'] ?? '')));
+        $password = (string) ($request['password'] ?? '');
+        $quota = trim((string) ($request['quota'] ?? ''));
+
+        if ($password === '' && $quota === '') {
+            throw new CE_Exception($this->user->lang('Please enter a new password or quota'));
+        }
+
+        if ($quota !== '' && !ctype_digit($quota)) {
+            throw new CE_Exception($this->user->lang('Please enter a valid quota'));
+        }
+
+        $this->assertOwnsMailbox($username, $email);
+        [$localPart, $domain] = $this->splitEmail($email);
+
+        if ($password !== '') {
+            $this->api->uapi($username, 'Email', 'passwd_pop', [
+                'email' => $localPart,
+                'domain' => $domain,
+                'password' => $password,
+            ]);
+        }
+
+        if ($quota !== '') {
+            $this->api->uapi($username, 'Email', 'edit_pop_quota', [
+                'email' => $localPart,
+                'domain' => $domain,
+                'quota' => (int) $quota,
+            ]);
+        }
+
+        return ['message' => $this->user->lang('Email account updated')];
+    }
+
+    /**
+     * Creates a webmail session for one of the account's mailboxes.
+     *
+     * @param UserPackage $userPackage
+     * @param array $request
+     *
+     * @return array
+     */
+    public function emailLogin(UserPackage $userPackage, array $request): array
+    {
+        $username = $this->setupPanel($userPackage);
+        $email = mb_strtolower(trim((string) ($request['email'] ?? '')));
+
+        // create_user_session runs as root and is not scoped to this account, so ownership must be checked first
+        $this->assertOwnsMailbox($username, $email);
+
+        $result = $this->api->call('create_user_session', [
+            'user' => $email,
+            'service' => 'webmaild',
+            'api.version' => '1',
+        ]);
+        if (empty($result->data->url)) {
+            throw new CE_Exception($this->user->lang('Unable to open webmail. Please try again later.'));
+        }
+
+        return ['data' => ['url' => $result->data->url]];
+    }
+
+    /**
+     * Sets up the API for a package's panel and returns its cPanel username.
+     *
+     * @param UserPackage $userPackage
+     *
+     * @return string
+     */
+    private function setupPanel(UserPackage $userPackage): string
+    {
+        $args = $this->updateArgs($this->buildParams($userPackage));
+        $this->setup($args);
+
+        $username = $args['package']['username'];
+        if ($username === '') {
+            throw new CE_Exception($this->user->lang('This package does not have a cPanel account'));
+        }
+
+        return $username;
+    }
+
+    /**
+     * Returns the account's mailboxes with disk usage, excluding the system mailbox.
+     *
+     * @param string $username
+     *
+     * @return array
+     */
+    private function getMailboxes(string $username): array
+    {
+        $mailboxes = [];
+        foreach ((array) $this->api->uapi($username, 'Email', 'list_pops_with_disk') as $mailbox) {
+            // The system mailbox has no domain part and can't be managed from here
+            $email = (string) ($mailbox->email ?? '');
+            if (mb_strpos($email, '@') === false) {
+                continue;
+            }
+
+            $usage = $this->getDiskUsageLabels($mailbox);
+            $mailboxes[] = [
+                'email' => $email,
+                'used' => $usage['used'],
+                'quota' => $usage['quota'],
+            ];
+        }
+
+        return $mailboxes;
+    }
+
+    /**
+     * Returns every domain on the account that can hold mailboxes.
+     *
+     * @param string $username
+     *
+     * @return array
+     */
+    private function getAccountDomains(string $username): array
+    {
+        $data = $this->api->uapi($username, 'DomainInfo', 'list_domains');
+
+        $domains = array_merge(
+            [$data->main_domain ?? ''],
+            (array) ($data->addon_domains ?? []),
+            (array) ($data->parked_domains ?? []),
+            (array) ($data->sub_domains ?? [])
+        );
+        $domains = array_map(fn ($domain) => mb_strtolower(trim((string) $domain)), $domains);
+
+        return array_values(array_unique(array_filter($domains)));
+    }
+
+    /**
+     * Throws unless the mailbox belongs to the given cPanel account.
+     *
+     * @param string $username
+     * @param string $email
+     *
+     * @return void
+     */
+    private function assertOwnsMailbox(string $username, string $email): void
+    {
+        if ($email === '') {
+            throw new CE_Exception($this->user->lang('Email account not found'));
+        }
+
+        foreach ((array) $this->api->uapi($username, 'Email', 'list_pops') as $mailbox) {
+            if (isset($mailbox->email) && mb_strtolower((string) $mailbox->email) === $email) {
+                return;
+            }
+        }
+
+        throw new CE_Exception($this->user->lang('Email account not found'));
+    }
+
+    /**
+     * Splits an email address into local part and domain.
+     *
+     * @param string $email
+     *
+     * @return array
+     */
+    private function splitEmail(string $email): array
+    {
+        $atPosition = mb_strrpos($email, '@');
+        if ($atPosition === false || $atPosition === 0) {
+            throw new CE_Exception($this->user->lang('Email account not found'));
+        }
+
+        return [mb_substr($email, 0, $atPosition), mb_substr($email, $atPosition + 1)];
+    }
+
+    /**
+     * Creates a single sign-on session for the package's own cPanel account.
+     *
+     * @param UserPackage $userPackage
+     * @param array $request
+     *
+     * @return array
+     */
+    public function ssoLogin(UserPackage $userPackage, array $request): array
+    {
+        $username = $this->setupPanel($userPackage);
+
+        $targets = $this->getSsoTargets();
+        $target = (string) ($request['target'] ?? '');
+        if (!isset($targets[$target])) {
+            throw new CE_Exception($this->user->lang('Invalid login option'));
+        }
+
+        // The session is always for the package's own account; the client only picks which service to open
+        $params = [
+            'user' => $username,
+            'service' => $targets[$target]['service'],
+            'api.version' => '1',
+        ];
+        if ($targets[$target]['app'] !== '') {
+            $params['app'] = $targets[$target]['app'];
+        }
+
+        $result = $this->api->call('create_user_session', $params);
+        if (empty($result->data->url)) {
+            throw new CE_Exception($this->user->lang('Unable to log in. Please try again later.'));
+        }
+
+        return ['data' => ['url' => $result->data->url]];
+    }
+
+    /**
+     * Returns the single sign-on options shown on the main package page.
+     *
+     * @return array
+     */
+    private function getSsoTargets(): array
+    {
+        return [
+            'cpanel' => [
+                'label' => $this->user->lang('cPanel'),
+                'icon' => 'fa fa-th-large',
+                'service' => 'cpaneld',
+                'app' => '',
+            ],
+            'webmail' => [
+                'label' => $this->user->lang('Webmail'),
+                'icon' => 'fa fa-envelope',
+                'service' => 'webmaild',
+                'app' => '',
+            ],
+            'filemanager' => [
+                'label' => $this->user->lang('File Manager'),
+                'icon' => 'fa fa-folder-open',
+                'service' => 'cpaneld',
+                'app' => 'FileManager_Home',
+            ],
+            'phpmyadmin' => [
+                'label' => $this->user->lang('phpMyAdmin'),
+                'icon' => 'fa fa-database',
+                'service' => 'cpaneld',
+                'app' => 'Database_phpMyAdmin',
+            ],
+        ];
+    }
+
+    /**
+     * Renders the Email Forwarders public panel.
+     *
+     * @param UserPackage $userPackage Package the panel is shown for (ownership verified by the controller)
+     * @param CE_View $view
+     *
+     * @return string
+     */
+    public function panelForwarders(UserPackage $userPackage, $view): string
+    {
+        $view->addScriptPath(__DIR__ . '/views/');
+        $view->userPackageId = $userPackage->getId();
+        $view->forwarders = [];
+        $view->domains = [];
+        $view->loadError = '';
+
+        try {
+            $username = $this->setupPanel($userPackage);
+            $view->forwarders = $this->getForwarders($username);
+            $view->domains = $this->getAccountDomains($username);
+        } catch (Exception $e) {
+            CE_Lib::log(1, 'cPanel forwarders panel failed to load for package ' . $userPackage->getId() . ': ' . $e->getMessage());
+            $view->loadError = $this->user->lang('Unable to load email forwarders. Please try again later.');
+        }
+
+        return $view->render('panelforwarders.phtml');
+    }
+
+    /**
+     * Creates a forwarder from an address on one of the account's domains to another email address.
+     *
+     * @param UserPackage $userPackage
+     * @param array $request
+     *
+     * @return array
+     */
+    public function createForwarder(UserPackage $userPackage, array $request): array
+    {
+        $username = $this->setupPanel($userPackage);
+
+        $localPart = mb_strtolower(trim((string) ($request['user'] ?? '')));
+        $domain = mb_strtolower(trim((string) ($request['domain'] ?? '')));
+        $destination = mb_strtolower(trim((string) ($request['destination'] ?? '')));
+
+        if (preg_match('/^[a-z0-9._+-]{1,64}$/', $localPart) !== 1) {
+            throw new CE_Exception($this->user->lang('Please enter a valid email address to forward'));
+        }
+
+        if (!in_array($domain, $this->getAccountDomains($username), true)) {
+            throw new CE_Exception($this->user->lang('Please select a valid domain'));
+        }
+
+        if (filter_var($destination, FILTER_VALIDATE_EMAIL) === false) {
+            throw new CE_Exception($this->user->lang('Please enter a valid destination email address'));
+        }
+
+        // Only plain forwarding is offered; other fwdopt modes (pipe, system account) are not available to clients
+        $this->api->uapi($username, 'Email', 'add_forwarder', [
+            'domain' => $domain,
+            'email' => $localPart . '@' . $domain,
+            'fwdopt' => 'fwd',
+            'fwdemail' => $destination,
+        ]);
+
+        return ['message' => $this->user->lang('Email forwarder created')];
+    }
+
+    /**
+     * Deletes one of the account's forwarders.
+     *
+     * @param UserPackage $userPackage
+     * @param array $request
+     *
+     * @return array
+     */
+    public function deleteForwarder(UserPackage $userPackage, array $request): array
+    {
+        $username = $this->setupPanel($userPackage);
+
+        $address = mb_strtolower(trim((string) ($request['address'] ?? '')));
+        $destination = trim((string) ($request['destination'] ?? ''));
+
+        $this->assertForwarderExists($username, $address, $destination);
+
+        $this->api->uapi($username, 'Email', 'delete_forwarder', [
+            'address' => $address,
+            'forwarder' => $destination,
+        ]);
+
+        return ['message' => $this->user->lang('Email forwarder deleted')];
+    }
+
+    /**
+     * Returns the account's email forwarders, one entry per address and destination pair.
+     *
+     * @param string $username
+     *
+     * @return array
+     */
+    private function getForwarders(string $username): array
+    {
+        $forwarders = [];
+        foreach ((array) $this->api->uapi($username, 'Email', 'list_forwarders') as $forwarder) {
+            $address = (string) ($forwarder->dest ?? '');
+            $destination = (string) ($forwarder->forward ?? '');
+            if ($address === '' || $destination === '') {
+                continue;
+            }
+
+            $forwarders[] = [
+                'address' => $address,
+                'destination' => $destination,
+            ];
+        }
+
+        return $forwarders;
+    }
+
+    /**
+     * Throws unless the forwarder exists on the given cPanel account.
+     *
+     * @param string $username
+     * @param string $address
+     * @param string $destination
+     *
+     * @return void
+     */
+    private function assertForwarderExists(string $username, string $address, string $destination): void
+    {
+        if ($address === '' || $destination === '') {
+            throw new CE_Exception($this->user->lang('Email forwarder not found'));
+        }
+
+        foreach ($this->getForwarders($username) as $forwarder) {
+            if (mb_strtolower($forwarder['address']) === $address && $forwarder['destination'] === $destination) {
+                return;
+            }
+        }
+
+        throw new CE_Exception($this->user->lang('Email forwarder not found'));
+    }
+
+    /**
+     * Renders the FTP Accounts public panel.
+     *
+     * @param UserPackage $userPackage Package the panel is shown for (ownership verified by the controller)
+     * @param CE_View $view
+     *
+     * @return string
+     */
+    public function panelFtp(UserPackage $userPackage, $view): string
+    {
+        $view->addScriptPath(__DIR__ . '/views/');
+        $view->userPackageId = $userPackage->getId();
+        $view->ftpAccounts = [];
+        $view->domains = [];
+        $view->loadError = '';
+
+        try {
+            $username = $this->setupPanel($userPackage);
+            $view->ftpAccounts = $this->getFtpAccounts($username);
+            $view->domains = $this->getAccountDomains($username);
+        } catch (Exception $e) {
+            CE_Lib::log(1, 'cPanel FTP panel failed to load for package ' . $userPackage->getId() . ': ' . $e->getMessage());
+            $view->loadError = $this->user->lang('Unable to load FTP accounts. Please try again later.');
+        }
+
+        return $view->render('panelftp.phtml');
+    }
+
+    /**
+     * Creates an additional FTP account on one of the account's domains.
+     *
+     * @param UserPackage $userPackage
+     * @param array $request
+     *
+     * @return array
+     */
+    public function createFtp(UserPackage $userPackage, array $request): array
+    {
+        $username = $this->setupPanel($userPackage);
+
+        $ftpUser = mb_strtolower(trim((string) ($request['user'] ?? '')));
+        $domain = mb_strtolower(trim((string) ($request['domain'] ?? '')));
+        $password = (string) ($request['password'] ?? '');
+        $homedir = trim((string) ($request['homedir'] ?? ''));
+        $quota = trim((string) ($request['quota'] ?? '0'));
+
+        if (preg_match('/^[a-z0-9._-]{1,64}$/', $ftpUser) !== 1) {
+            throw new CE_Exception($this->user->lang('Please enter a valid FTP username'));
+        }
+
+        if (!in_array($domain, $this->getAccountDomains($username), true)) {
+            throw new CE_Exception($this->user->lang('Please select a valid domain'));
+        }
+
+        if ($password === '') {
+            throw new CE_Exception($this->user->lang('Please enter a password'));
+        }
+
+        if ($homedir !== '' && !$this->isValidHomedir($homedir)) {
+            throw new CE_Exception($this->user->lang('Please enter a valid directory'));
+        }
+
+        if ($quota === '' || !ctype_digit($quota)) {
+            throw new CE_Exception($this->user->lang('Please enter a valid quota'));
+        }
+
+        $params = [
+            'user' => $ftpUser,
+            'domain' => $domain,
+            'pass' => $password,
+            'quota' => (int) $quota,
+        ];
+        // Left blank, cPanel picks its default directory for the new account
+        if ($homedir !== '') {
+            $params['homedir'] = $homedir;
+        }
+
+        $this->api->uapi($username, 'Ftp', 'add_ftp', $params);
+
+        return ['message' => $this->user->lang('FTP account created')];
+    }
+
+    /**
+     * Deletes one of the account's additional FTP accounts, keeping its files.
+     *
+     * @param UserPackage $userPackage
+     * @param array $request
+     *
+     * @return array
+     */
+    public function deleteFtp(UserPackage $userPackage, array $request): array
+    {
+        $username = $this->setupPanel($userPackage);
+        $login = mb_strtolower(trim((string) ($request['login'] ?? '')));
+
+        $this->assertOwnsFtpAccount($username, $login);
+        [$ftpUser, $domain] = $this->splitEmail($login);
+
+        // destroy=0 removes the login only; the files in its directory are left in place
+        $this->api->uapi($username, 'Ftp', 'delete_ftp', [
+            'user' => $ftpUser,
+            'domain' => $domain,
+            'destroy' => 0,
+        ]);
+
+        return ['message' => $this->user->lang('FTP account deleted')];
+    }
+
+    /**
+     * Changes the password and/or quota of one of the account's additional FTP accounts.
+     * Blank fields are left unchanged.
+     *
+     * @param UserPackage $userPackage
+     * @param array $request
+     *
+     * @return array
+     */
+    public function updateFtp(UserPackage $userPackage, array $request): array
+    {
+        $username = $this->setupPanel($userPackage);
+
+        $login = mb_strtolower(trim((string) ($request['login'] ?? '')));
+        $password = (string) ($request['password'] ?? '');
+        $quota = trim((string) ($request['quota'] ?? ''));
+
+        if ($password === '' && $quota === '') {
+            throw new CE_Exception($this->user->lang('Please enter a new password or quota'));
+        }
+
+        if ($quota !== '' && !ctype_digit($quota)) {
+            throw new CE_Exception($this->user->lang('Please enter a valid quota'));
+        }
+
+        $this->assertOwnsFtpAccount($username, $login);
+        [$ftpUser, $domain] = $this->splitEmail($login);
+
+        if ($password !== '') {
+            $this->api->uapi($username, 'Ftp', 'passwd', [
+                'user' => $ftpUser,
+                'domain' => $domain,
+                'pass' => $password,
+            ]);
+        }
+
+        if ($quota !== '') {
+            $this->api->uapi($username, 'Ftp', 'set_quota', [
+                'user' => $ftpUser,
+                'domain' => $domain,
+                'quota' => (int) $quota,
+            ]);
+        }
+
+        return ['message' => $this->user->lang('FTP account updated')];
+    }
+
+    /**
+     * Returns the account's additional FTP accounts with disk usage.
+     *
+     * @param string $username
+     *
+     * @return array
+     */
+    private function getFtpAccounts(string $username): array
+    {
+        $accounts = [];
+        foreach ((array) $this->api->uapi($username, 'Ftp', 'list_ftp_with_disk') as $account) {
+            // The main, anonymous and log access entries belong to the cPanel account itself and can't be managed here
+            if ((string) ($account->accttype ?? '') !== 'sub') {
+                continue;
+            }
+
+            $login = (string) ($account->login ?? '');
+            if (mb_strpos($login, '@') === false) {
+                continue;
+            }
+
+            // reldir is relative to the account's home directory, matching what clients enter when creating an account
+            $directory = (string) ($account->reldir ?? '');
+            $usage = $this->getDiskUsageLabels($account);
+            $accounts[] = [
+                'login' => $login,
+                'directory' => ($directory === '') ? '/' : $directory,
+                'used' => $usage['used'],
+                'quota' => $usage['quota'],
+            ];
+        }
+
+        return $accounts;
+    }
+
+    /**
+     * Throws unless the login is one of the account's additional FTP accounts.
+     *
+     * @param string $username
+     * @param string $login
+     *
+     * @return void
+     */
+    private function assertOwnsFtpAccount(string $username, string $login): void
+    {
+        if ($login === '') {
+            throw new CE_Exception($this->user->lang('FTP account not found'));
+        }
+
+        foreach ($this->getFtpAccounts($username) as $account) {
+            if (mb_strtolower($account['login']) === $login) {
+                return;
+            }
+        }
+
+        throw new CE_Exception($this->user->lang('FTP account not found'));
+    }
+
+    /**
+     * Checks that a client-supplied FTP directory stays relative to the account's home directory.
+     *
+     * @param string $homedir
+     *
+     * @return bool
+     */
+    private function isValidHomedir(string $homedir): bool
+    {
+        if (preg_match('#^[a-zA-Z0-9._/-]{1,255}$#', $homedir) !== 1) {
+            return false;
+        }
+
+        if (mb_substr($homedir, 0, 1) === '/') {
+            return false;
+        }
+
+        foreach (explode('/', $homedir) as $segment) {
+            if ($segment === '..') {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Builds display labels for used space and quota from a cPanel disk usage row.
+     * cPanel reports both zero usage and an unlimited quota as "None", so the raw values decide which applies.
+     *
+     * @param object $row
+     *
+     * @return array
+     */
+    private function getDiskUsageLabels(object $row): array
+    {
+        $usedRaw = (int) ($row->_diskused ?? $row->diskused ?? 0);
+        $used = ($usedRaw === 0) ? '0 MB' : (string) ($row->humandiskused ?? '');
+
+        $quotaText = mb_strtolower((string) ($row->diskquota ?? ''));
+        $isUnlimited = $quotaText === 'unlimited' || (int) ($row->_diskquota ?? $row->diskquota ?? 0) === 0;
+        $quota = $isUnlimited ? $this->user->lang('Unlimited') : (string) ($row->humandiskquota ?? '');
+
+        return [
+            'used' => $used,
+            'quota' => $quota,
+        ];
+    }
+
+    /**
+     * Renders the MySQL Databases public panel.
+     *
+     * @param UserPackage $userPackage Package the panel is shown for (ownership verified by the controller)
+     * @param CE_View $view
+     *
+     * @return string
+     */
+    public function panelMysql(UserPackage $userPackage, $view): string
+    {
+        $view->addScriptPath(__DIR__ . '/views/');
+        $view->userPackageId = $userPackage->getId();
+        $view->databases = [];
+        $view->dbUsers = [];
+        $view->mysql = [];
+        $view->loadError = '';
+
+        try {
+            $username = $this->setupPanel($userPackage);
+            $restrictions = $this->getMysqlRestrictions($username);
+            $view->databases = $this->getDatabases($username, $restrictions['prefix']);
+            $view->dbUsers = $this->getDbUsers($username, $restrictions['prefix']);
+            // Passed as an array so CE_View does not escape the prefix on assignment; the template escapes it
+            $view->mysql = $restrictions;
+        } catch (Exception $e) {
+            CE_Lib::log(1, 'cPanel MySQL panel failed to load for package ' . $userPackage->getId() . ': ' . $e->getMessage());
+            $view->loadError = $this->user->lang('Unable to load MySQL databases. Please try again later.');
+        }
+
+        return $view->render('panelmysql.phtml');
+    }
+
+    /**
+     * Creates a database using the account's required name prefix.
+     *
+     * @param UserPackage $userPackage
+     * @param array $request
+     *
+     * @return array
+     */
+    public function createDatabase(UserPackage $userPackage, array $request): array
+    {
+        $username = $this->setupPanel($userPackage);
+        $restrictions = $this->getMysqlRestrictions($username);
+
+        $name = $this->buildPrefixedName(
+            (string) ($request['name'] ?? ''),
+            $restrictions['prefix'],
+            $restrictions['maxDatabaseLength'],
+            $this->user->lang('Please enter a valid database name')
+        );
+
+        $this->api->uapi($username, 'Mysql', 'create_database', [
+            'name' => $name,
+        ]);
+
+        return ['message' => $this->user->lang('Database created')];
+    }
+
+    /**
+     * Deletes one of the account's databases and all of its data.
+     *
+     * @param UserPackage $userPackage
+     * @param array $request
+     *
+     * @return array
+     */
+    public function deleteDatabase(UserPackage $userPackage, array $request): array
+    {
+        $username = $this->setupPanel($userPackage);
+        $restrictions = $this->getMysqlRestrictions($username);
+        $name = trim((string) ($request['database'] ?? ''));
+
+        $this->assertDatabaseExists($username, $restrictions['prefix'], $name);
+
+        $this->api->uapi($username, 'Mysql', 'delete_database', [
+            'name' => $name,
+        ]);
+
+        return ['message' => $this->user->lang('Database deleted')];
+    }
+
+    /**
+     * Creates a database user using the account's required name prefix.
+     *
+     * @param UserPackage $userPackage
+     * @param array $request
+     *
+     * @return array
+     */
+    public function createDbUser(UserPackage $userPackage, array $request): array
+    {
+        $username = $this->setupPanel($userPackage);
+        $restrictions = $this->getMysqlRestrictions($username);
+
+        $name = $this->buildPrefixedName(
+            (string) ($request['name'] ?? ''),
+            $restrictions['prefix'],
+            $restrictions['maxUsernameLength'],
+            $this->user->lang('Please enter a valid username')
+        );
+
+        $password = (string) ($request['password'] ?? '');
+        if ($password === '') {
+            throw new CE_Exception($this->user->lang('Please enter a password'));
+        }
+
+        $this->api->uapi($username, 'Mysql', 'create_user', [
+            'name' => $name,
+            'password' => $password,
+        ]);
+
+        return ['message' => $this->user->lang('Database user created')];
+    }
+
+    /**
+     * Deletes one of the account's database users.
+     *
+     * @param UserPackage $userPackage
+     * @param array $request
+     *
+     * @return array
+     */
+    public function deleteDbUser(UserPackage $userPackage, array $request): array
+    {
+        $username = $this->setupPanel($userPackage);
+        $restrictions = $this->getMysqlRestrictions($username);
+        $name = trim((string) ($request['user'] ?? ''));
+
+        $this->assertDbUserExists($username, $restrictions['prefix'], $name);
+
+        $this->api->uapi($username, 'Mysql', 'delete_user', [
+            'name' => $name,
+        ]);
+
+        return ['message' => $this->user->lang('Database user deleted')];
+    }
+
+    /**
+     * Changes the password of one of the account's database users.
+     *
+     * @param UserPackage $userPackage
+     * @param array $request
+     *
+     * @return array
+     */
+    public function updateDbUserPassword(UserPackage $userPackage, array $request): array
+    {
+        $username = $this->setupPanel($userPackage);
+        $restrictions = $this->getMysqlRestrictions($username);
+
+        $name = trim((string) ($request['user'] ?? ''));
+        $password = (string) ($request['password'] ?? '');
+
+        if ($password === '') {
+            throw new CE_Exception($this->user->lang('Please enter a password'));
+        }
+
+        $this->assertDbUserExists($username, $restrictions['prefix'], $name);
+
+        $this->api->uapi($username, 'Mysql', 'set_password', [
+            'user' => $name,
+            'password' => $password,
+        ]);
+
+        return ['message' => $this->user->lang('Database user password changed')];
+    }
+
+    /**
+     * Grants a database user all privileges on a database.
+     *
+     * @param UserPackage $userPackage
+     * @param array $request
+     *
+     * @return array
+     */
+    public function grantDbAccess(UserPackage $userPackage, array $request): array
+    {
+        $username = $this->setupPanel($userPackage);
+        $restrictions = $this->getMysqlRestrictions($username);
+
+        $database = trim((string) ($request['database'] ?? ''));
+        $user = trim((string) ($request['user'] ?? ''));
+
+        $this->assertDatabaseExists($username, $restrictions['prefix'], $database);
+        $this->assertDbUserExists($username, $restrictions['prefix'], $user);
+
+        // Only full access is offered to clients for now; finer-grained privileges can be added if needed
+        $this->api->uapi($username, 'Mysql', 'set_privileges_on_database', [
+            'user' => $user,
+            'database' => $database,
+            'privileges' => 'ALL PRIVILEGES',
+        ]);
+
+        return ['message' => $this->user->lang('User added to database')];
+    }
+
+    /**
+     * Removes a database user's access to a database.
+     *
+     * @param UserPackage $userPackage
+     * @param array $request
+     *
+     * @return array
+     */
+    public function revokeDbAccess(UserPackage $userPackage, array $request): array
+    {
+        $username = $this->setupPanel($userPackage);
+        $restrictions = $this->getMysqlRestrictions($username);
+
+        $database = trim((string) ($request['database'] ?? ''));
+        $user = trim((string) ($request['user'] ?? ''));
+
+        $this->assertDatabaseExists($username, $restrictions['prefix'], $database);
+        $this->assertDbUserExists($username, $restrictions['prefix'], $user);
+
+        $this->api->uapi($username, 'Mysql', 'revoke_access_to_database', [
+            'user' => $user,
+            'database' => $database,
+        ]);
+
+        return ['message' => $this->user->lang('User removed from database')];
+    }
+
+    /**
+     * Returns the account's MySQL naming rules: the required prefix and maximum name lengths.
+     *
+     * @param string $username
+     *
+     * @return array
+     */
+    private function getMysqlRestrictions(string $username): array
+    {
+        $data = $this->api->uapi($username, 'Mysql', 'get_restrictions');
+
+        return [
+            'prefix' => (string) ($data->prefix ?? ''),
+            'maxDatabaseLength' => (int) ($data->max_database_name_length ?? 64),
+            'maxUsernameLength' => (int) ($data->max_username_length ?? 32),
+        ];
+    }
+
+    /**
+     * Builds a prefixed database or user name from the part the client typed, and validates it.
+     *
+     * @param string $suffix
+     * @param string $prefix
+     * @param int $maxLength
+     * @param string $errorMessage
+     *
+     * @return string
+     */
+    private function buildPrefixedName(string $suffix, string $prefix, int $maxLength, string $errorMessage): string
+    {
+        $suffix = mb_strtolower(trim($suffix));
+        if (preg_match('/^[a-z0-9_]{1,64}$/', $suffix) !== 1) {
+            throw new CE_Exception($errorMessage);
+        }
+
+        $name = $prefix . $suffix;
+        if (mb_strlen($name) > $maxLength) {
+            throw new CE_Exception($this->user->lang('The name can be at most %d characters long, including the prefix', $maxLength));
+        }
+
+        return $name;
+    }
+
+    /**
+     * Returns the account's databases that use its prefix, with size and the users that can access each.
+     *
+     * @param string $username
+     * @param string $prefix
+     *
+     * @return array
+     */
+    private function getDatabases(string $username, string $prefix): array
+    {
+        $databases = [];
+        foreach ((array) $this->api->uapi($username, 'Mysql', 'list_databases') as $database) {
+            $name = (string) ($database->database ?? '');
+            if ($name === '' || mb_strpos($name, $prefix) !== 0) {
+                continue;
+            }
+
+            $users = array_map('strval', (array) ($database->users ?? []));
+            sort($users);
+
+            $databases[] = [
+                'name' => $name,
+                'size' => $this->formatBytes((int) ($database->disk_usage ?? 0)),
+                'users' => $users,
+            ];
+        }
+
+        return $databases;
+    }
+
+    /**
+     * Returns the account's database users that use its prefix, with the databases each can access.
+     *
+     * @param string $username
+     * @param string $prefix
+     *
+     * @return array
+     */
+    private function getDbUsers(string $username, string $prefix): array
+    {
+        $users = [];
+        foreach ((array) $this->api->uapi($username, 'Mysql', 'list_users') as $dbUser) {
+            $name = (string) ($dbUser->user ?? '');
+            if ($name === '' || mb_strpos($name, $prefix) !== 0) {
+                continue;
+            }
+
+            $databases = array_map('strval', (array) ($dbUser->databases ?? []));
+            sort($databases);
+
+            $users[] = [
+                'name' => $name,
+                'databases' => $databases,
+            ];
+        }
+
+        return $users;
+    }
+
+    /**
+     * Throws unless the database is one of the account's prefixed databases.
+     *
+     * @param string $username
+     * @param string $prefix
+     * @param string $name
+     *
+     * @return void
+     */
+    private function assertDatabaseExists(string $username, string $prefix, string $name): void
+    {
+        if ($name === '') {
+            throw new CE_Exception($this->user->lang('Database not found'));
+        }
+
+        foreach ($this->getDatabases($username, $prefix) as $database) {
+            if ($database['name'] === $name) {
+                return;
+            }
+        }
+
+        throw new CE_Exception($this->user->lang('Database not found'));
+    }
+
+    /**
+     * Throws unless the user is one of the account's prefixed database users.
+     *
+     * @param string $username
+     * @param string $prefix
+     * @param string $name
+     *
+     * @return void
+     */
+    private function assertDbUserExists(string $username, string $prefix, string $name): void
+    {
+        if ($name === '') {
+            throw new CE_Exception($this->user->lang('Database user not found'));
+        }
+
+        foreach ($this->getDbUsers($username, $prefix) as $dbUser) {
+            if ($dbUser['name'] === $name) {
+                return;
+            }
+        }
+
+        throw new CE_Exception($this->user->lang('Database user not found'));
+    }
+
+    /**
+     * Formats a byte count for display.
+     *
+     * @param int $bytes
+     *
+     * @return string
+     */
+    private function formatBytes(int $bytes): string
+    {
+        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        $size = (float) $bytes;
+        $unit = 0;
+        while ($size >= 1024 && $unit < count($units) - 1) {
+            $size /= 1024;
+            $unit++;
+        }
+
+        if ($unit === 0) {
+            return $bytes . ' ' . $units[$unit];
+        }
+
+        return number_format($size, 2) . ' ' . $units[$unit];
     }
 }
